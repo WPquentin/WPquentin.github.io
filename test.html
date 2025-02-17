@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
-  <title>µ¯Ä»Ê¾Àý£ºËÑË÷¡¢Ìø×ª¡¢Á÷Ê½¡¢Ê±¼ä¸ñÊ½µÈ¹¦ÄÜ</title>
+  <title>弹幕示例：搜索、跳转、流式、时间格式等功能</title>
   <style>
     body {
       margin: 0;
@@ -15,9 +15,9 @@
     }
     main {
       display: flex;
-      height: calc(100vh - 100px); /* ¼õÈ¥header+footer´ó¸Å¸ß¶È */
+      height: calc(100vh - 100px); /* 减去header+footer大概高度 */
     }
-    /* ×ó²àÃæ°å */
+    /* 左侧面板 */
     #left-panel {
       width: 260px;
       border-right: 1px solid #ccc;
@@ -33,7 +33,7 @@
       margin-bottom: 10px;
     }
 
-    /* µ¯Ä»ÁÐ±íÇøÓò */
+    /* 弹幕列表区域 */
     #danmu-container {
       flex: 1;
       background: #fff;
@@ -45,14 +45,14 @@
     .danmu-line {
       margin: 3px 0;
       padding: 3px;
-      cursor: pointer;  /* Êó±ê·ÅÉÏ¿Éµã»÷ */
+      cursor: pointer;  /* 鼠标放上可点击 */
       transition: background 0.1s;
     }
     .danmu-line:hover {
       background: #fafafa;
     }
     .danmu-line.highlighted {
-      background: #ffe58f;  /* µ±Ç°Á÷Ê½²¥·Å¸ßÁÁ */
+      background: #ffe58f;  /* 当前流式播放高亮 */
       border-left: 3px solid #f90;
     }
     .time-label {
@@ -61,96 +61,96 @@
       font-size: 0.9em;
     }
     .highlight {
-      background: yellow;  /* ËÑË÷´Ê¸ßÁÁ */
+      background: yellow;  /* 搜索词高亮 */
     }
 
-    /* ÕÛµþµÄÁ÷Ê½²¥·Å¿ØÖÆ */
+    /* 折叠的流式播放控制 */
     #stream-controls {
       margin-top: 10px;
       padding: 10px;
       border: 1px solid #ccc;
       background: #fafafa;
-      display: none; /* Ä¬ÈÏÒþ²Ø£¬µã»÷¡°Á÷Ê½¡±°´Å¥Ê±Õ¹¿ª */
+      display: none; /* 默认隐藏，点击“流式”按钮时展开 */
     }
   </style>
 </head>
 <body>
 <header>
-  <h1>µ¯Ä»Ê¾Àý</h1>
+  <h1>弹幕示例</h1>
 </header>
 
 <main>
-  <!-- ×ó²àÃæ°å£º¼ÓÔØ/ËÑË÷/Ìø×ª/Á÷Ê½/»Øµ½¿ªÍ·µÈ -->
+  <!-- 左侧面板：加载/搜索/跳转/流式/回到开头等 -->
   <div id="left-panel">
-    <!-- 1) ¼ÓÔØXML -->
+    <!-- 1) 加载XML -->
     <div class="row">
-      <h2>¼ÓÔØ XML</h2>
+      <h2>加载 XML</h2>
       <input type="file" id="xmlFile" accept=".xml"/><br/>
-      <button onclick="onLoadFile()">¼ÓÔØ</button>
+      <button onclick="onLoadFile()">加载</button>
       <br/><br/>
       <input type="text" id="xmlUrl" placeholder="https://example.com/danmu.xml" size="20"/>
-      <button onclick="onLoadUrl()">¼ÓÔØ</button>
+      <button onclick="onLoadUrl()">加载</button>
       <div id="errorMsg" style="color:red; margin-top:5px;"></div>
     </div>
 
-    <!-- 2) ËÑË÷µ¯Ä» -->
+    <!-- 2) 搜索弹幕 -->
     <div class="row">
-      <h2>ËÑË÷</h2>
-      <input type="text" id="searchInput" placeholder="ÊäÈë¹Ø¼ü×Ö" size="15"/>
-      <button onclick="doSearch()">ËÑË÷</button>
-      <button onclick="clearSearch()">ÖØÖÃ</button>
+      <h2>搜索</h2>
+      <input type="text" id="searchInput" placeholder="输入关键字" size="15"/>
+      <button onclick="doSearch()">搜索</button>
+      <button onclick="clearSearch()">重置</button>
     </div>
 
-    <!-- 3) Ê±¼äÌø×ª -->
+    <!-- 3) 时间跳转 -->
     <div class="row">
-      <h2>Ê±¼äÌø×ª</h2>
-      <input type="text" id="jumpTimeInput" placeholder="Èç 120 »ò 00:02:00" size="10"/>
-      <button onclick="manualJump()">Ìø×ª</button>
+      <h2>时间跳转</h2>
+      <input type="text" id="jumpTimeInput" placeholder="如 120 或 00:02:00" size="10"/>
+      <button onclick="manualJump()">跳转</button>
     </div>
 
-    <!-- 4) ²¥·Å¿ØÖÆ (Ä¬ÈÏÒþ²Ø) -->
+    <!-- 4) 播放控制 (默认隐藏) -->
     <div class="row">
-      <button onclick="rewind()">»Øµ½¿ªÍ·</button>
-      <button onclick="toggleStreamPanel()">Á÷Ê½</button>
+      <button onclick="rewind()">回到开头</button>
+      <button onclick="toggleStreamPanel()">流式</button>
     </div>
 
     <div id="stream-controls">
-      <button onclick="startPlayback()">²¥·Å</button>
-      <button onclick="pausePlayback()">ÔÝÍ£</button>
-      <button onclick="resumePlayback()">»Ö¸´</button>
+      <button onclick="startPlayback()">播放</button>
+      <button onclick="pausePlayback()">暂停</button>
+      <button onclick="resumePlayback()">恢复</button>
       <br/><br/>
-      <label>²¥·ÅËÙ¶È(ºÁÃë/Ìõ)£º</label>
+      <label>播放速度(毫秒/条)：</label>
       <input type="range" id="speedRange" min="50" max="5000" step="50" value="1000" oninput="onSpeedChange()"/>
       <span id="speedLabel">1000</span>
     </div>
   </div>
 
-  <!-- µ¯Ä»ÏÔÊ¾ -->
+  <!-- 弹幕显示 -->
   <div id="danmu-container"></div>
 </main>
 
 <footer>
   <p style="margin:0; text-align:center;">
-    ½ö×÷Ê¾Àý£¬Ö§³Ö£ºËÑË÷/µã»÷Ìø×ª¡¢ÊÖ¶¯Ê±¼äÌø×ª¡¢Á÷Ê½¸ßÁÁ¡¢×Ô¶¯¹ö¶¯¾ÓÖÐ
+    仅作示例，支持：搜索/点击跳转、手动时间跳转、流式高亮、自动滚动居中
   </p>
 </footer>
 
 <script>
 
-/** ===================== È«¾ÖÊý¾Ý ===================== */
-let danmuData = [];     // Ô­Ê¼µ¯Ä» { time: number, text: string }
-let filteredData = [];  // ËÑË÷Ö®ºó±£ÁôµÄµ¯Ä»
-let currentIndex = 0;   // Á÷Ê½²¥·Åµ±Ç°Ë÷Òý
-let isPlaying = false;  // ÊÇ·ñÔÚ²¥·Å
-let timer = null;       // setInterval¾ä±ú
-let speed = 1000;       // ²¥·ÅËÙ¶È ms/Ìõ
+/** ===================== 全局数据 ===================== */
+let danmuData = [];     // 原始弹幕 { time: number, text: string }
+let filteredData = [];  // 搜索之后保留的弹幕
+let currentIndex = 0;   // 流式播放当前索引
+let isPlaying = false;  // 是否在播放
+let timer = null;       // setInterval句柄
+let speed = 1000;       // 播放速度 ms/条
 
-// ========== ½âÎö²¢¼ÓÔØXML  ==========
+// ========== 解析并加载XML  ==========
 function onLoadFile() {
   const fileInput = document.getElementById('xmlFile');
   const file = fileInput.files[0];
   if (!file) {
-    showError('ÇëÑ¡ÔñXMLÎÄ¼þ');
+    showError('请选择XML文件');
     return;
   }
   clearError();
@@ -158,21 +158,21 @@ function onLoadFile() {
   reader.onload = e => {
     handleXmlString(e.target.result);
   };
-  reader.onerror = () => showError('ÎÄ¼þ¶ÁÈ¡Ê§°Ü');
+  reader.onerror = () => showError('文件读取失败');
   reader.readAsText(file, 'utf-8');
 }
 
 function onLoadUrl() {
   const url = document.getElementById('xmlUrl').value.trim();
   if (!url) {
-    showError('ÇëÊäÈëURLµØÖ·');
+    showError('请输入URL地址');
     return;
   }
   clearError();
   fetch(url)
     .then(resp => {
       if (!resp.ok) {
-        throw new Error('ÍøÂçÇëÇóÊ§°Ü£¬×´Ì¬Âë: ' + resp.status);
+        throw new Error('网络请求失败，状态码: ' + resp.status);
       }
       return resp.text();
     })
@@ -180,7 +180,7 @@ function onLoadUrl() {
       handleXmlString(text);
     })
     .catch(err => {
-      showError('¼ÓÔØÊ§°Ü: ' + err.message);
+      showError('加载失败: ' + err.message);
     });
 }
 
@@ -190,10 +190,10 @@ function handleXmlString(xmlStr) {
     const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
 
     if (xmlDoc.querySelector('parsererror')) {
-      throw new Error('XML¸ñÊ½½âÎöÊ§°Ü');
+      throw new Error('XML格式解析失败');
     }
 
-    // ÌáÈ¡ <d> ½Úµã
+    // 提取 <d> 节点
     const dNodes = xmlDoc.getElementsByTagName('d');
     danmuData = [];
     for (let i=0; i<dNodes.length; i++) {
@@ -211,26 +211,26 @@ function handleXmlString(xmlStr) {
       danmuData.push({ time: timeVal, text });
     }
 
-    // °´Ê±¼äÉýÐò
+    // 按时间升序
     danmuData.sort((a,b) => a.time - b.time);
-    // ¸´ÖÆ¸ø filteredData ²¢äÖÈ¾
+    // 复制给 filteredData 并渲染
     filteredData = danmuData.slice();
-    resetPlayback();  // »áäÖÈ¾È«²¿µ¯Ä»
+    resetPlayback();  // 会渲染全部弹幕
     if (danmuData.length === 0) {
-      showError('XMLÖÐÎ´ÕÒµ½ÈÎºÎµ¯Ä»');
+      showError('XML中未找到任何弹幕');
     } else {
       clearError();
     }
   } catch(err) {
-    showError('XML´¦ÀíÊ§°Ü: ' + err.message);
+    showError('XML处理失败: ' + err.message);
   }
 }
 
-// ========== ËÑË÷ & ¸ßÁÁµã»÷Ìø×ª ==========
+// ========== 搜索 & 高亮点击跳转 ==========
 function doSearch() {
   const kw = document.getElementById('searchInput').value.trim();
   if (!kw) {
-    // Èô¹Ø¼ü´ÊÎª¿Õ£¬Ôò»Ö¸´È«²¿
+    // 若关键词为空，则恢复全部
     filteredData = danmuData.slice();
     resetPlayback();
     return;
@@ -244,23 +244,23 @@ function clearSearch() {
   resetPlayback();
 }
 
-// ========== ÊÖ¶¯Ê±¼äÌø×ª ==========
+// ========== 手动时间跳转 ==========
 function manualJump() {
   const val = document.getElementById('jumpTimeInput').value.trim();
   if (!val) return;
-  // Ö§³Ö "120" (Ãë) »ò "00:02:00" (Ê±:·Ö:Ãë)
+  // 支持 "120" (秒) 或 "00:02:00" (时:分:秒)
   const secs = parseTimeString(val);
   jumpToTime(secs);
   document.getElementById('jumpTimeInput').value = '';
 }
 
-// ½«ÐÎÈç "00:01:10" ×ª»»Îª×ÜÃëÊý
+// 将形如 "00:01:10" 转换为总秒数
 function parseTimeString(str) {
-  // Èç¹ûÖ»°üº¬Êý×Ö£¬ÔòÖ±½Ó×ª»»
+  // 如果只包含数字，则直接转换
   if (/^\d+$/.test(str)) {
     return parseFloat(str);
   }
-  // Èô°üº¬Ã°ºÅ
+  // 若包含冒号
   const parts = str.split(':').map(n=>parseFloat(n));
   let sec = 0;
   if (parts.length === 1) {
@@ -275,7 +275,7 @@ function parseTimeString(str) {
   return sec;
 }
 
-// ========== Ê±¼ä¸ñÊ½»¯ hh:mm:ss ==========
+// ========== 时间格式化 hh:mm:ss ==========
 function formatTime(sec) {
   if (!sec || sec<0) sec=0;
   const h = Math.floor(sec/3600);
@@ -284,19 +284,19 @@ function formatTime(sec) {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// ========== µ¯Ä»ÈÝÆ÷äÖÈ¾£ºÄ¬ÈÏÏÔÊ¾È«²¿ ==========
+// ========== 弹幕容器渲染：默认显示全部 ==========
 function renderAllDanmu() {
   const container = document.getElementById('danmu-container');
   container.innerHTML = '';
   if (filteredData.length === 0) {
-    container.innerHTML = '<p>ÎÞµ¯Ä»</p>';
+    container.innerHTML = '<p>无弹幕</p>';
     return;
   }
   filteredData.forEach((item, idx) => {
     const line = document.createElement('div');
     line.className = 'danmu-line';
     line.innerHTML = `<span class="time-label">[${formatTime(item.time)}]</span> ${highlightIfNeeded(item.text)}`;
-    // µã»÷Ìø×ªµ½¸Ãµ¯Ä»Ê±¼ä
+    // 点击跳转到该弹幕时间
     line.addEventListener('click', () => {
       jumpToTime(item.time);
     });
@@ -304,53 +304,53 @@ function renderAllDanmu() {
   });
 }
 
-// ËÑË÷¹Ø¼ü´Ê¸ßÁÁ
+// 搜索关键词高亮
 function highlightIfNeeded(text) {
   const kw = document.getElementById('searchInput').value.trim();
   if (!kw) return text;
-  // ¼òµ¥µÄÈ«²¿Ìæ»»
+  // 简单的全部替换
   return text.replaceAll(kw, `<span class="highlight">${kw}</span>`);
 }
 
-// ========== Ê±¼äÌø×ª (¾«×¼µ½ filteredData) ==========
+// ========== 时间跳转 (精准到 filteredData) ==========
 function jumpToTime(targetSec) {
-  // ÕÒµ½ filteredData ÖÐ >= targetSec µÄË÷Òý
+  // 找到 filteredData 中 >= targetSec 的索引
   const idx = filteredData.findIndex(d => d.time >= targetSec);
   if (idx < 0) {
-    // ´óÓÚËùÓÐÊ±¼ä£¬ÔòÌøµ½×îºó
+    // 大于所有时间，则跳到最后
     currentIndex = filteredData.length;
   } else {
     currentIndex = idx;
   }
-  // ÈôÒÑÔÚÁ÷Ê½²¥·Å£¬¾ÍÖØ»æ»òÏÈÔÝÍ£
-  // ÕâÀï×ö¼òµ¥´¦Àí£ºÖØ»æ²¢±£³ÖÔ­²¥·Å×´Ì¬
+  // 若已在流式播放，就重绘或先暂停
+  // 这里做简单处理：重绘并保持原播放状态
   renderAllDanmu();
   if (isPlaying) {
-    // Ç¿ÖÆÈÃÏÂÒ»Ìõ²¥·ÅÊÇ currentIndex
-    // highlightCurrent() ºóÒ²¿É×Ô¶¯¹ö¶¯
+    // 强制让下一条播放是 currentIndex
+    // highlightCurrent() 后也可自动滚动
     highlightCurrent();
   } else {
-    // ²»ÔÚ²¥·ÅÊ±£¬Ö±½Ó¹öµ½ÄÇÒ»Ìõ
+    // 不在播放时，直接滚到那一条
     scrollToLine(currentIndex);
   }
 }
 
-// ¹ö¶¯Ê¹µÚ idx ÌõÔÚÈÝÆ÷ÖÐÑë
+// 滚动使第 idx 条在容器中央
 function scrollToLine(idx) {
   const container = document.getElementById('danmu-container');
   const lineEls = container.getElementsByClassName('danmu-line');
   if (idx < 0 || idx >= lineEls.length) return;
   const line = lineEls[idx];
-  // ¼ÆËãÒª¹ö¶¯µÄÆ«ÒÆÁ¿
+  // 计算要滚动的偏移量
   const containerRect = container.getBoundingClientRect();
   const lineRect = line.getBoundingClientRect();
   const offset = (lineRect.top + lineRect.height/2) - (containerRect.top + containerRect.height/2);
   container.scrollTop += offset;
 }
 
-// ========== Á÷Ê½²¥·Å¹¦ÄÜ ==========
-// Ä¬ÈÏÖ»ÏÔÊ¾Ò»¸ö¡°»Øµ½¿ªÍ·¡±ºÍ¡°Á÷Ê½¡±°´Å¥
-// µ±µã»÷¡°Á÷Ê½¡±Ê±²ÅÕ¹¿ªÆäËü²¥·Å°´Å¥
+// ========== 流式播放功能 ==========
+// 默认只显示一个“回到开头”和“流式”按钮
+// 当点击“流式”时才展开其它播放按钮
 
 function toggleStreamPanel() {
   const panel = document.getElementById('stream-controls');
@@ -362,10 +362,10 @@ function toggleStreamPanel() {
 }
 
 function startPlayback() {
-  // Ã¿´Îµã»÷²¥·Å£¬ÏÈ´ÓÍ·¿ªÊ¼
+  // 每次点击播放，先从头开始
   resetPlayback();
   if (filteredData.length === 0) {
-    showError('ÎÞµ¯Ä»¿É²¥·Å');
+    showError('无弹幕可播放');
     return;
   }
   isPlaying = true;
@@ -395,7 +395,7 @@ function resetPlayback() {
   renderAllDanmu();
 }
 
-// Ã¿´Î²¥·ÅÒ»Ìõ
+// 每次播放一条
 function playNext() {
   if (currentIndex >= filteredData.length) {
     stopTimer();
@@ -406,11 +406,11 @@ function playNext() {
   currentIndex++;
 }
 
-// ¸ßÁÁµ±Ç°µ¯Ä» & Ê¹Æä¹ö¶¯µ½ÈÝÆ÷ÖÐÑë
+// 高亮当前弹幕 & 使其滚动到容器中央
 function highlightCurrent() {
   const container = document.getElementById('danmu-container');
   const lineEls = container.getElementsByClassName('danmu-line');
-  // ÏÈÇå³ýËùÓÐhighlighted
+  // 先清除所有highlighted
   for (let el of lineEls) {
     el.classList.remove('highlighted');
   }
@@ -427,19 +427,19 @@ function stopTimer() {
   }
 }
 
-// ========== ËÙ¶Èµ÷½Ú ==========
+// ========== 速度调节 ==========
 function onSpeedChange() {
   const val = document.getElementById('speedRange').value;
   speed = parseInt(val, 10);
   document.getElementById('speedLabel').textContent = speed;
   if (isPlaying) {
-    // Í£Ö¹Ô­¶¨Ê±Æ÷£¬ÖØÐÂÆô¶¯
+    // 停止原定时器，重新启动
     stopTimer();
     timer = setInterval(playNext, speed);
   }
 }
 
-// ========== ²¥·ÅÖØÖÃÊ±µÄÄ¬ÈÏäÖÈ¾(ÏÔÊ¾È«²¿) ==========
+// ========== 播放重置时的默认渲染(显示全部) ==========
 function resetPlayback() {
   stopTimer();
   isPlaying = false;
@@ -447,7 +447,7 @@ function resetPlayback() {
   renderAllDanmu();
 }
 
-// ========== ¹¤¾ßº¯Êý: ´íÎóÌáÊ¾ ==========
+// ========== 工具函数: 错误提示 ==========
 function showError(msg) {
   document.getElementById('errorMsg').textContent = msg;
 }
