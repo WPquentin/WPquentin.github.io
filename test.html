@@ -2,78 +2,58 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
-  <title>弹幕密度示例</title>
-  <!-- 引入 Chart.js（示例使用cdn） -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>µ¯Ä»Ê¾Àý£ºËÑË÷¡¢Ìø×ª¡¢Á÷Ê½¡¢Ê±¼ä¸ñÊ½µÈ¹¦ÄÜ</title>
   <style>
     body {
-      margin: 0; 
-      padding: 0; 
+      margin: 0;
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
     }
-    header {
+    header, footer {
       padding: 10px;
       background: #333;
       color: #fff;
     }
     main {
-      flex: 1; 
       display: flex;
-      overflow: hidden;
+      height: calc(100vh - 100px); /* ¼õÈ¥header+footer´ó¸Å¸ß¶È */
     }
-    /* 左侧控制面板 */
+    /* ×ó²àÃæ°å */
     #left-panel {
-      width: 220px;
+      width: 260px;
       border-right: 1px solid #ccc;
       padding: 10px;
-      overflow-y: auto;
       background: #f1f1f1;
+      box-sizing: border-box;
+      overflow-y: auto;
     }
     #left-panel h2 {
       margin-top: 0;
     }
-    #left-panel input[type="search"] {
-      width: 100%;
-      box-sizing: border-box;
-    }
-    #left-panel .section {
+    .row {
       margin-bottom: 10px;
     }
 
-    /* 中间弹幕区域 + 图表 */
-    #center-panel {
+    /* µ¯Ä»ÁÐ±íÇøÓò */
+    #danmu-container {
       flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
-    #chart-container {
-      height: 200px; 
-      border-bottom: 1px solid #ccc;
-      padding: 10px;
-      background: #fafafa;
-    }
-    #chart-container canvas {
-      width: 100%; 
-      height: 100%;
-    }
-
-    /* 弹幕列表区 */
-    #danmu-list {
-      flex: 1;
+      background: #fff;
       overflow-y: auto;
       padding: 10px;
-      background: #fff;
+      box-sizing: border-box;
+      position: relative;
     }
     .danmu-line {
-      margin: 5px 0;
-      padding: 2px;
-      transition: background 0.2s;
+      margin: 3px 0;
+      padding: 3px;
+      cursor: pointer;  /* Êó±ê·ÅÉÏ¿Éµã»÷ */
+      transition: background 0.1s;
     }
     .danmu-line:hover {
-      background: #f0f8ff;
+      background: #fafafa;
+    }
+    .danmu-line.highlighted {
+      background: #ffe58f;  /* µ±Ç°Á÷Ê½²¥·Å¸ßÁÁ */
+      border-left: 3px solid #f90;
     }
     .time-label {
       color: #666;
@@ -81,151 +61,139 @@
       font-size: 0.9em;
     }
     .highlight {
-      background: yellow;
+      background: yellow;  /* ËÑË÷´Ê¸ßÁÁ */
     }
 
-    /* 右侧彩条 */
-    #right-panel {
-      width: 40px; 
-      border-left: 1px solid #ccc;
-      background: #eee;
-      display: flex;
-      flex-direction: column;
-      cursor: pointer;
-    }
-    .density-segment {
-      width: 100%;
-      height: 10px;
-    }
-
-    footer {
-      padding: 5px;
-      background: #ddd;
-      text-align: center;
+    /* ÕÛµþµÄÁ÷Ê½²¥·Å¿ØÖÆ */
+    #stream-controls {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      display: none; /* Ä¬ÈÏÒþ²Ø£¬µã»÷¡°Á÷Ê½¡±°´Å¥Ê±Õ¹¿ª */
     }
   </style>
 </head>
 <body>
-
 <header>
-  <h1>弹幕密度图 + 流式示例</h1>
+  <h1>µ¯Ä»Ê¾Àý</h1>
 </header>
 
 <main>
-  <!-- 左侧控制面板 -->
+  <!-- ×ó²àÃæ°å£º¼ÓÔØ/ËÑË÷/Ìø×ª/Á÷Ê½/»Øµ½¿ªÍ·µÈ -->
   <div id="left-panel">
-    <div class="section">
-      <h2>加载XML</h2>
-      <input type="file" id="xmlFile" accept=".xml"/>
-      <button onclick="onLoadFile()">加载</button>
-
+    <!-- 1) ¼ÓÔØXML -->
+    <div class="row">
+      <h2>¼ÓÔØ XML</h2>
+      <input type="file" id="xmlFile" accept=".xml"/><br/>
+      <button onclick="onLoadFile()">¼ÓÔØ</button>
       <br/><br/>
       <input type="text" id="xmlUrl" placeholder="https://example.com/danmu.xml" size="20"/>
-      <button onclick="onLoadUrl()">加载</button>
+      <button onclick="onLoadUrl()">¼ÓÔØ</button>
+      <div id="errorMsg" style="color:red; margin-top:5px;"></div>
     </div>
 
-    <div class="section">
-      <h2>搜索</h2>
-      <input type="search" id="searchText" placeholder="输入关键词"/>
-      <button onclick="doSearch()">搜索</button>
-      <button onclick="clearSearch()">重置</button>
+    <!-- 2) ËÑË÷µ¯Ä» -->
+    <div class="row">
+      <h2>ËÑË÷</h2>
+      <input type="text" id="searchInput" placeholder="ÊäÈë¹Ø¼ü×Ö" size="15"/>
+      <button onclick="doSearch()">ËÑË÷</button>
+      <button onclick="clearSearch()">ÖØÖÃ</button>
     </div>
 
-    <div class="section">
-      <h2>播放控制</h2>
-      <button onclick="startPlayback()">开始播放</button>
-      <button onclick="pausePlayback()">暂停</button>
-      <button onclick="resumePlayback()">恢复</button>
-      <button onclick="rewind()">回到开头</button>
+    <!-- 3) Ê±¼äÌø×ª -->
+    <div class="row">
+      <h2>Ê±¼äÌø×ª</h2>
+      <input type="text" id="jumpTimeInput" placeholder="Èç 120 »ò 00:02:00" size="10"/>
+      <button onclick="manualJump()">Ìø×ª</button>
+    </div>
+
+    <!-- 4) ²¥·Å¿ØÖÆ (Ä¬ÈÏÒþ²Ø) -->
+    <div class="row">
+      <button onclick="rewind()">»Øµ½¿ªÍ·</button>
+      <button onclick="toggleStreamPanel()">Á÷Ê½</button>
+    </div>
+
+    <div id="stream-controls">
+      <button onclick="startPlayback()">²¥·Å</button>
+      <button onclick="pausePlayback()">ÔÝÍ£</button>
+      <button onclick="resumePlayback()">»Ö¸´</button>
       <br/><br/>
-      <label>速度(ms/条)：</label>
-      <input type="range" min="100" max="2000" step="100" value="1000" oninput="changeSpeed(this.value)">
-      <span id="speedDisplay">1000</span>
+      <label>²¥·ÅËÙ¶È(ºÁÃë/Ìõ)£º</label>
+      <input type="range" id="speedRange" min="50" max="5000" step="50" value="1000" oninput="onSpeedChange()"/>
+      <span id="speedLabel">1000</span>
     </div>
-
-    <div class="section" id="errorMsg" style="color:red;"></div>
   </div>
 
-  <!-- 中间区域：图表 + 弹幕列表 -->
-  <div id="center-panel">
-    <div id="chart-container">
-      <canvas id="densityChart"></canvas>
-    </div>
-    <div id="danmu-list"></div>
-  </div>
-
-  <!-- 右侧：弹幕密度彩条 -->
-  <div id="right-panel"></div>
+  <!-- µ¯Ä»ÏÔÊ¾ -->
+  <div id="danmu-container"></div>
 </main>
 
 <footer>
-  <span>简单示例，点击图表或右侧彩带可跳转时间</span>
+  <p style="margin:0; text-align:center;">
+    ½ö×÷Ê¾Àý£¬Ö§³Ö£ºËÑË÷/µã»÷Ìø×ª¡¢ÊÖ¶¯Ê±¼äÌø×ª¡¢Á÷Ê½¸ßÁÁ¡¢×Ô¶¯¹ö¶¯¾ÓÖÐ
+  </p>
 </footer>
 
 <script>
-/** -------------- 全局变量 -------------- */
-let danmuData = [];      // 原始弹幕数据 {time, text}
-let filteredData = [];   // 搜索或其他过滤后的弹幕
-let buckets = [];        // 分桶后的弹幕密度 { start, end, count }
 
-let currentIndex = 0;    // 当前播放到 filteredData 的索引
-let isPlaying = false;
-let timer = null;
-let speed = 1000;        // 默认 1000ms / 条弹幕
+/** ===================== È«¾ÖÊý¾Ý ===================== */
+let danmuData = [];     // Ô­Ê¼µ¯Ä» { time: number, text: string }
+let filteredData = [];  // ËÑË÷Ö®ºó±£ÁôµÄµ¯Ä»
+let currentIndex = 0;   // Á÷Ê½²¥·Åµ±Ç°Ë÷Òý
+let isPlaying = false;  // ÊÇ·ñÔÚ²¥·Å
+let timer = null;       // setInterval¾ä±ú
+let speed = 1000;       // ²¥·ÅËÙ¶È ms/Ìõ
 
-// Chart.js 对象
-let densityChart = null;
-
-// 仅渲染前后多少条弹幕
-const RENDER_RANGE = 20;
-
-// ============== 加载与解析 XML ==============
-
+// ========== ½âÎö²¢¼ÓÔØXML  ==========
 function onLoadFile() {
   const fileInput = document.getElementById('xmlFile');
   const file = fileInput.files[0];
   if (!file) {
-    showError('请选择XML文件');
+    showError('ÇëÑ¡ÔñXMLÎÄ¼þ');
     return;
   }
   clearError();
   const reader = new FileReader();
   reader.onload = e => {
-    const xmlStr = e.target.result;
-    handleXml(xmlStr);
+    handleXmlString(e.target.result);
   };
-  reader.onerror = () => showError('文件读取失败');
+  reader.onerror = () => showError('ÎÄ¼þ¶ÁÈ¡Ê§°Ü');
   reader.readAsText(file, 'utf-8');
 }
 
 function onLoadUrl() {
   const url = document.getElementById('xmlUrl').value.trim();
   if (!url) {
-    showError('请输入url');
+    showError('ÇëÊäÈëURLµØÖ·');
     return;
   }
   clearError();
   fetch(url)
     .then(resp => {
       if (!resp.ok) {
-        throw new Error(`HTTP错误：${resp.status}`);
+        throw new Error('ÍøÂçÇëÇóÊ§°Ü£¬×´Ì¬Âë: ' + resp.status);
       }
       return resp.text();
     })
-    .then(xmlStr => {
-      handleXml(xmlStr);
+    .then(text => {
+      handleXmlString(text);
     })
-    .catch(err => showError('加载失败:' + err.message));
+    .catch(err => {
+      showError('¼ÓÔØÊ§°Ü: ' + err.message);
+    });
 }
 
-function handleXml(xmlStr) {
+function handleXmlString(xmlStr) {
   try {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+
     if (xmlDoc.querySelector('parsererror')) {
-      throw new Error('XML解析失败');
+      throw new Error('XML¸ñÊ½½âÎöÊ§°Ü');
     }
-    // 提取 <d> 节点
+
+    // ÌáÈ¡ <d> ½Úµã
     const dNodes = xmlDoc.getElementsByTagName('d');
     danmuData = [];
     for (let i=0; i<dNodes.length; i++) {
@@ -234,38 +202,35 @@ function handleXml(xmlStr) {
       const text = dEl.textContent || '';
       let timeVal = 0;
       const parts = pAttr.split(',');
-      if (parts[0]) {
+      if (parts.length > 0) {
         const t = parseFloat(parts[0]);
-        if (!isNaN(t)) timeVal = t;
+        if (!isNaN(t)) {
+          timeVal = t;
+        }
       }
-      danmuData.push({ time: timeVal, text: text });
+      danmuData.push({ time: timeVal, text });
     }
-    // 按时间升序排序
-    danmuData.sort((a,b)=>a.time - b.time);
 
-    // 重置搜索 & 播放
-    filteredData = danmuData.slice(); // 初始不过滤
-    resetPlayback();
-
-    // 统计分桶
-    buckets = makeBuckets(danmuData, 10); // 10秒为一桶
-    renderDensityChart(buckets);
-    renderDensityBar(buckets);
-
-    clearError();
+    // °´Ê±¼äÉýÐò
+    danmuData.sort((a,b) => a.time - b.time);
+    // ¸´ÖÆ¸ø filteredData ²¢äÖÈ¾
+    filteredData = danmuData.slice();
+    resetPlayback();  // »áäÖÈ¾È«²¿µ¯Ä»
     if (danmuData.length === 0) {
-      showError('未找到任何弹幕');
+      showError('XMLÖÐÎ´ÕÒµ½ÈÎºÎµ¯Ä»');
+    } else {
+      clearError();
     }
-  } catch (err) {
-    showError('XML处理失败:' + err.message);
+  } catch(err) {
+    showError('XML´¦ÀíÊ§°Ü: ' + err.message);
   }
 }
 
-// ============== 搜索功能 ==============
+// ========== ËÑË÷ & ¸ßÁÁµã»÷Ìø×ª ==========
 function doSearch() {
-  const kw = document.getElementById('searchText').value.trim();
+  const kw = document.getElementById('searchInput').value.trim();
   if (!kw) {
-    // 无输入则恢复全部
+    // Èô¹Ø¼ü´ÊÎª¿Õ£¬Ôò»Ö¸´È«²¿
     filteredData = danmuData.slice();
     resetPlayback();
     return;
@@ -274,155 +239,133 @@ function doSearch() {
   resetPlayback();
 }
 function clearSearch() {
-  document.getElementById('searchText').value = '';
+  document.getElementById('searchInput').value = '';
   filteredData = danmuData.slice();
   resetPlayback();
 }
 
-// ============== 分桶统计 ==============
-function makeBuckets(data, bucketSize=10) {
-  // bucketSize=10 表示每10秒为一段
-  if (!data || data.length===0) return [];
-  const minT = data[0].time;
-  const maxT = data[data.length-1].time;
-  const nBuckets = Math.ceil((maxT-minT)/bucketSize);
-  const result = [];
-  for(let i=0; i<nBuckets; i++){
-    const start = minT + i*bucketSize;
-    result.push({ 
-      start: start, 
-      end: start+bucketSize,
-      count: 0
-    });
+// ========== ÊÖ¶¯Ê±¼äÌø×ª ==========
+function manualJump() {
+  const val = document.getElementById('jumpTimeInput').value.trim();
+  if (!val) return;
+  // Ö§³Ö "120" (Ãë) »ò "00:02:00" (Ê±:·Ö:Ãë)
+  const secs = parseTimeString(val);
+  jumpToTime(secs);
+  document.getElementById('jumpTimeInput').value = '';
+}
+
+// ½«ÐÎÈç "00:01:10" ×ª»»Îª×ÜÃëÊý
+function parseTimeString(str) {
+  // Èç¹ûÖ»°üº¬Êý×Ö£¬ÔòÖ±½Ó×ª»»
+  if (/^\d+$/.test(str)) {
+    return parseFloat(str);
   }
-  // 统计
-  data.forEach(item=>{
-    const idx = Math.floor((item.time - minT)/bucketSize);
-    if (idx>=0 && idx<result.length) {
-      result[idx].count++;
-    }
-  });
-  return result;
-}
-
-// ============== 绘制折线图 (Chart.js) ==============
-function renderDensityChart(buckets) {
-  const ctx = document.getElementById('densityChart').getContext('2d');
-  if (densityChart) {
-    densityChart.destroy();
+  // Èô°üº¬Ã°ºÅ
+  const parts = str.split(':').map(n=>parseFloat(n));
+  let sec = 0;
+  if (parts.length === 1) {
+    sec = parts[0];
+  } else if (parts.length === 2) {
+    // mm:ss
+    sec = parts[0]*60 + parts[1];
+  } else if (parts.length === 3) {
+    // hh:mm:ss
+    sec = parts[0]*3600 + parts[1]*60 + parts[2];
   }
-  const labels = buckets.map(b=>b.start.toFixed(0)+'s~');
-  const counts = buckets.map(b=>b.count);
-
-  densityChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '弹幕数量',
-        data: counts,
-        borderColor: '#409eff',
-        backgroundColor: 'rgba(64,158,255, 0.2)'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      onClick: (evt, elements) => {
-        // 点击获取最近的点
-        if (!elements || !elements.length) return;
-        const idx = elements[0].index;
-        const bucket = buckets[idx];
-        // 跳转到该桶起始时间
-        jumpToTime(bucket.start);
-      },
-      scales: {
-        x: { title: { display:true, text:'时间段(秒)' } },
-        y: { title: { display:true, text:'弹幕数' } }
-      },
-      plugins: {
-        legend: { display:false }
-      }
-    }
-  });
+  return sec;
 }
 
-// ============== 绘制右侧彩色条 ==============
-function renderDensityBar(buckets) {
-  const rightPanel = document.getElementById('right-panel');
-  rightPanel.innerHTML = '';
-  if (!buckets || buckets.length===0) return;
-
-  // 找到最大弹幕数
-  const maxCount = Math.max(...buckets.map(b=>b.count));
-
-  buckets.forEach((b, idx)=>{
-    const div = document.createElement('div');
-    div.className = 'density-segment';
-    // 计算颜色深度: 以count/maxCount为参考
-    const ratio = (maxCount>0) ? b.count/maxCount : 0;
-    const colorVal = Math.floor(255 - ratio*150); 
-    // 设一个从 #FFFFFF -> #55aaaa 的渐变(示例)
-    div.style.backgroundColor = `rgb(255,${colorVal},${colorVal})`;
-    div.style.flex = 1; // 平分垂直空间
-
-    div.onclick = ()=>{ jumpToTime(b.start); };
-    rightPanel.appendChild(div);
-  });
+// ========== Ê±¼ä¸ñÊ½»¯ hh:mm:ss ==========
+function formatTime(sec) {
+  if (!sec || sec<0) sec=0;
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// ============== 时间跳转 & 弹幕渲染 ==============
-let currentTime = 0;
-
-function jumpToTime(t) {
-  // 找到在 filteredData 中最接近 time==t 的索引
-  const idx = filteredData.findIndex(item => item.time>=t);
-  if (idx === -1) {
-    // 大于所有弹幕时间，则跳到最后
-    currentIndex = filteredData.length;
-    currentTime = (filteredData.length>0)?filteredData[filteredData.length-1].time : 0;
-  } else {
-    currentIndex = idx;
-    currentTime = filteredData[idx].time;
-  }
-  renderDanmuList();
-}
-
-// 只渲染当前Index附近 RENDER_RANGE 条
-function renderDanmuList() {
-  const container = document.getElementById('danmu-list');
+// ========== µ¯Ä»ÈÝÆ÷äÖÈ¾£ºÄ¬ÈÏÏÔÊ¾È«²¿ ==========
+function renderAllDanmu() {
+  const container = document.getElementById('danmu-container');
   container.innerHTML = '';
-
-  if (filteredData.length===0) {
-    container.innerHTML = '<p>无弹幕</p>';
+  if (filteredData.length === 0) {
+    container.innerHTML = '<p>ÎÞµ¯Ä»</p>';
     return;
   }
-  // 在 currentIndex 附近 ± RENDER_RANGE
-  const start = Math.max(0, currentIndex - RENDER_RANGE);
-  const end   = Math.min(filteredData.length, currentIndex + RENDER_RANGE);
-
-  for (let i=start; i<end; i++){
-    const item = filteredData[i];
+  filteredData.forEach((item, idx) => {
     const line = document.createElement('div');
     line.className = 'danmu-line';
-    line.innerHTML = `<span class="time-label">[${item.time.toFixed(2)}s]</span> ${highlightIfNeeded(item.text)}`;
+    line.innerHTML = `<span class="time-label">[${formatTime(item.time)}]</span> ${highlightIfNeeded(item.text)}`;
+    // µã»÷Ìø×ªµ½¸Ãµ¯Ä»Ê±¼ä
+    line.addEventListener('click', () => {
+      jumpToTime(item.time);
+    });
     container.appendChild(line);
-  }
+  });
 }
 
-// 搜索高亮
+// ËÑË÷¹Ø¼ü´Ê¸ßÁÁ
 function highlightIfNeeded(text) {
-  const kw = document.getElementById('searchText').value.trim();
+  const kw = document.getElementById('searchInput').value.trim();
   if (!kw) return text;
-  // 简单的包含替换
+  // ¼òµ¥µÄÈ«²¿Ìæ»»
   return text.replaceAll(kw, `<span class="highlight">${kw}</span>`);
 }
 
-// ============== 流式播放示例 ==============
+// ========== Ê±¼äÌø×ª (¾«×¼µ½ filteredData) ==========
+function jumpToTime(targetSec) {
+  // ÕÒµ½ filteredData ÖÐ >= targetSec µÄË÷Òý
+  const idx = filteredData.findIndex(d => d.time >= targetSec);
+  if (idx < 0) {
+    // ´óÓÚËùÓÐÊ±¼ä£¬ÔòÌøµ½×îºó
+    currentIndex = filteredData.length;
+  } else {
+    currentIndex = idx;
+  }
+  // ÈôÒÑÔÚÁ÷Ê½²¥·Å£¬¾ÍÖØ»æ»òÏÈÔÝÍ£
+  // ÕâÀï×ö¼òµ¥´¦Àí£ºÖØ»æ²¢±£³ÖÔ­²¥·Å×´Ì¬
+  renderAllDanmu();
+  if (isPlaying) {
+    // Ç¿ÖÆÈÃÏÂÒ»Ìõ²¥·ÅÊÇ currentIndex
+    // highlightCurrent() ºóÒ²¿É×Ô¶¯¹ö¶¯
+    highlightCurrent();
+  } else {
+    // ²»ÔÚ²¥·ÅÊ±£¬Ö±½Ó¹öµ½ÄÇÒ»Ìõ
+    scrollToLine(currentIndex);
+  }
+}
+
+// ¹ö¶¯Ê¹µÚ idx ÌõÔÚÈÝÆ÷ÖÐÑë
+function scrollToLine(idx) {
+  const container = document.getElementById('danmu-container');
+  const lineEls = container.getElementsByClassName('danmu-line');
+  if (idx < 0 || idx >= lineEls.length) return;
+  const line = lineEls[idx];
+  // ¼ÆËãÒª¹ö¶¯µÄÆ«ÒÆÁ¿
+  const containerRect = container.getBoundingClientRect();
+  const lineRect = line.getBoundingClientRect();
+  const offset = (lineRect.top + lineRect.height/2) - (containerRect.top + containerRect.height/2);
+  container.scrollTop += offset;
+}
+
+// ========== Á÷Ê½²¥·Å¹¦ÄÜ ==========
+// Ä¬ÈÏÖ»ÏÔÊ¾Ò»¸ö¡°»Øµ½¿ªÍ·¡±ºÍ¡°Á÷Ê½¡±°´Å¥
+// µ±µã»÷¡°Á÷Ê½¡±Ê±²ÅÕ¹¿ªÆäËü²¥·Å°´Å¥
+
+function toggleStreamPanel() {
+  const panel = document.getElementById('stream-controls');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
 function startPlayback() {
+  // Ã¿´Îµã»÷²¥·Å£¬ÏÈ´ÓÍ·¿ªÊ¼
   resetPlayback();
-  if (filteredData.length===0) {
-    showError('无弹幕数据');
+  if (filteredData.length === 0) {
+    showError('ÎÞµ¯Ä»¿É²¥·Å');
     return;
   }
   isPlaying = true;
@@ -435,7 +378,7 @@ function pausePlayback() {
 }
 
 function resumePlayback() {
-  if (!isPlaying && filteredData.length>0 && currentIndex<filteredData.length) {
+  if (!isPlaying && currentIndex < filteredData.length) {
     isPlaying = true;
     timer = setInterval(playNext, speed);
   }
@@ -449,20 +392,32 @@ function resetPlayback() {
   stopTimer();
   isPlaying = false;
   currentIndex = 0;
-  currentTime = 0;
-  renderDanmuList();
+  renderAllDanmu();
 }
 
+// Ã¿´Î²¥·ÅÒ»Ìõ
 function playNext() {
   if (currentIndex >= filteredData.length) {
     stopTimer();
     isPlaying = false;
     return;
   }
-  // 显示当前这条，并索引+1
-  currentTime = filteredData[currentIndex].time;
+  highlightCurrent();
   currentIndex++;
-  renderDanmuList();
+}
+
+// ¸ßÁÁµ±Ç°µ¯Ä» & Ê¹Æä¹ö¶¯µ½ÈÝÆ÷ÖÐÑë
+function highlightCurrent() {
+  const container = document.getElementById('danmu-container');
+  const lineEls = container.getElementsByClassName('danmu-line');
+  // ÏÈÇå³ýËùÓÐhighlighted
+  for (let el of lineEls) {
+    el.classList.remove('highlighted');
+  }
+  if (currentIndex < 0 || currentIndex >= lineEls.length) return;
+  const targetLine = lineEls[currentIndex];
+  targetLine.classList.add('highlighted');
+  scrollToLine(currentIndex);
 }
 
 function stopTimer() {
@@ -472,22 +427,31 @@ function stopTimer() {
   }
 }
 
-// ============== 播放速度 ==============
-function changeSpeed(val) {
-  speed = parseInt(val,10);
-  document.getElementById('speedDisplay').textContent = speed;
+// ========== ËÙ¶Èµ÷½Ú ==========
+function onSpeedChange() {
+  const val = document.getElementById('speedRange').value;
+  speed = parseInt(val, 10);
+  document.getElementById('speedLabel').textContent = speed;
   if (isPlaying) {
-    // 重启定时器
+    // Í£Ö¹Ô­¶¨Ê±Æ÷£¬ÖØÐÂÆô¶¯
     stopTimer();
     timer = setInterval(playNext, speed);
   }
 }
 
-// ============== 工具函数 ==============
-function showError(msg){
+// ========== ²¥·ÅÖØÖÃÊ±µÄÄ¬ÈÏäÖÈ¾(ÏÔÊ¾È«²¿) ==========
+function resetPlayback() {
+  stopTimer();
+  isPlaying = false;
+  currentIndex = 0;
+  renderAllDanmu();
+}
+
+// ========== ¹¤¾ßº¯Êý: ´íÎóÌáÊ¾ ==========
+function showError(msg) {
   document.getElementById('errorMsg').textContent = msg;
 }
-function clearError(){
+function clearError() {
   document.getElementById('errorMsg').textContent = '';
 }
 </script>
