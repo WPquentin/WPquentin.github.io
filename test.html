@@ -1,663 +1,795 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <title>Danmaku Analysis</title>
+  <meta charset="UTF-8"/>
+  <title>Danmu Test</title>
+  <!-- ECharts CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2/dist/echarts-wordcloud.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    /* Toolbar layouts */
-    .toolbar { margin-bottom: 10px; }
-    .toolbar label { margin-right: 5px; font-weight: bold; }
-    .toolbar input[type="text"] { width: 300px; padding: 3px; }
-    .toolbar input[type="file"] { padding: 3px; }
-    .toolbar button { margin-right: 10px; padding: 5px 10px; }
-    .toolbar select { margin: 0 10px 0 5px; padding: 3px; }
-    /* Comment list container */
-    #commentContainer { 
-      border: 1px solid #ccc; padding: 5px; 
-      height: 400px; overflow-y: auto; 
-      background: #fafafa;
+    body {
+      margin: 10px;
+      font-family: sans-serif;
     }
-    #commentList li { line-height: 1.5em; padding: 2px 5px; }
-    #commentList li .time { color: #888; width: 60px; display: inline-block; }
-    #commentList li.current { background: #ffffcc; }  /* highlighted comment */
-    /* Hidden state for search filtering */
-    .hidden { display: none !important; }
-    /* Error message style */
-    #errorMsg { color: red; margin-top: 5px; }
-    /* Back to search button */
-    #backBtn { display: none; margin-left: 10px; }
-    /* Density chart container */
-    #densityChart { width: 100%; height: 200px; margin-top: 10px; }
-    /* Word cloud overlay */
+    .toolbar {
+      margin-bottom: 10px;
+    }
+    .toolbar button,
+    .toolbar input,
+    .toolbar select {
+      margin-right: 6px;
+    }
+
+    #errorMsg {
+      color: red;
+      margin-top: 5px;
+    }
+
+    /* 左侧搜索&加载区 / 中间弹幕区 / 右侧图表区 */
+    #layout {
+      display: flex;
+      gap: 10px;
+    }
+    #leftPanel {
+      width: 260px;
+      background: #f1f1f1;
+      border: 1px solid #ccc;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    #leftPanel h3 {
+      margin-top: 0;
+    }
+    #danmuPanel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    /* 弹幕列表 */
+    #danmuContainer {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+      background: #fff;
+    }
+    .danmu-line {
+      margin: 3px 0;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .danmu-line:hover {
+      background: #f9f9f9;
+    }
+    .danmu-line.current {
+      background: #ffe58f;
+      border-left: 3px solid #f90;
+      padding-left: 3px;
+    }
+
+    /* 词云弹窗 */
     #wordCloudOverlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5); z-index: 999;
+      display: none;
+      position: fixed; 
+      top:0; left:0; 
+      width:100%; height:100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
     }
-    #wordCloudOverlay #wordCloud {
-      position: relative;
-      width: 80%; height: 80%;
-      margin: 5% auto; background: #fff; border: 1px solid #ccc;
+    #wordCloudContainer {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      height: 80%;
+      background: #fff;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
     }
     #closeWordCloudBtn {
-      position: absolute; top: 10px; right: 10px;
-      padding: 3px 8px;
+      position: absolute;
+      right: 10px; top: 10px;
+      cursor: pointer;
+      background: #ccc;
+      border: none;
+      padding: 5px 8px;
     }
     #copyMsg {
-      position: absolute; bottom: 10px; width: 100%; text-align: center;
-      color: green; font-weight: bold; display: none;
+      position: absolute; 
+      bottom: 10px; 
+      width:100%;
+      text-align: center;
+      color: green;
+      display: none;
+    }
+
+    /* 折线图容器 */
+    #chartPanel {
+      height: 200px;
+      border-top: 1px solid #ccc;
+    }
+    #chartPanel canvas {
+      width: 100%;
+      height: 100%;
     }
   </style>
 </head>
+
 <body>
 
-  <!-- Toolbar: File and URL Loading -->
-  <div class="toolbar">
-    <label for="fileInput">XML文件:</label>
-    <input type="file" id="fileInput" accept=".xml" />
-    <button id="loadFileBtn">加载</button>
-    <label for="urlInput" style="margin-left:20px;">XML链接:</label>
-    <input type="text" id="urlInput" placeholder="输入XML地址" />
-    <button id="loadUrlBtn">加载</button>
-    <div id="errorMsg"></div>
+<div class="toolbar">
+  <!-- 加载XML -->
+  <label>XML文件:</label>
+  <input type="file" id="xmlFile" accept=".xml"/>
+  <button id="loadFileBtn">加载</button>
+
+  <label style="margin-left:15px;">XML链接:</label>
+  <input type="text" id="xmlUrl" placeholder="https://example.com/danmu.xml" size="30"/>
+  <button id="loadUrlBtn">加载</button>
+
+  <div id="errorMsg"></div>
+</div>
+
+<div class="toolbar">
+  <!-- 弹幕过滤(默认过滤“哈哈”、“喝水”)-->
+  <label>Drop弹幕(逗号分隔)</label>
+  <input type="text" id="dropWords" value="哈哈,喝水" size="15"/>
+  <span style="font-size:0.9em;color:#666;">(默认过滤这些关键词)</span>
+</div>
+
+<div class="toolbar">
+  <!-- 搜索 -->
+  <label>搜索:</label>
+  <input type="text" id="searchInput" placeholder="多词用空格" size="18"/>
+  <label><input type="radio" name="searchMode" value="AND" />且</label>
+  <label><input type="radio" name="searchMode" value="OR" checked/>或</label>
+  <button id="searchBtn">搜索</button>
+  <button id="exitSearchBtn">退出搜索</button>
+  <button id="wordCloudBtn">词云</button>
+</div>
+
+<div class="toolbar">
+  <!-- 播放器控制：基于“每秒多少条弹幕” -->
+  <button id="playPauseBtn">播放</button>
+  <label>速度(条/秒)：</label>
+  <input type="range" id="speedRange" min="1" max="10" step="1" value="2"/>
+  <span id="speedVal">2</span>
+  <button id="rewindBtn">回到开头</button>
+
+  <label style="margin-left:10px;">跳转:</label>
+  <input type="text" id="timeJump" placeholder="120 or 00:02:00" size="8"/>
+  <button id="jumpBtn">跳转</button>
+</div>
+
+<div id="layout">
+  <!-- 左面板 -->
+  <div id="leftPanel">
+    <h3>搜索结果</h3>
+    <!-- 在搜索模式下，这里可以显示匹配到的弹幕数或列表(可选) -->
+    <div id="searchResult" style="font-size:0.9em; color:#666;">无搜索</div>
+    <hr/>
+    <p>点击折线图/搜索结果可跳转到<br>全部弹幕中的对应时间</p>
   </div>
 
-  <!-- Toolbar: Search and Word Cloud -->
-  <div class="toolbar">
-    <label for="searchInput">搜索:</label>
-    <input type="text" id="searchInput" placeholder="多关键词用空格分隔" />
-    <label><input type="radio" name="searchMode" value="AND" id="andMode"> 所有词</label>
-    <label><input type="radio" name="searchMode" value="OR" id="orMode" checked> 任意词</label>
-    <button id="searchBtn">搜索</button>
-    <button id="wordCloudBtn">词云</button>
-    <button id="backBtn">返回搜索结果</button>
+  <!-- 中部：弹幕列表 & 折线图 -->
+  <div id="danmuPanel">
+    <div id="danmuContainer"></div>
+    <div id="chartPanel"></div>
   </div>
+</div>
 
-  <!-- Toolbar: Playback controls -->
-  <div class="toolbar">
-    <button id="playPauseBtn">播放</button>
-    <label for="speedSelect">速度:</label>
-    <select id="speedSelect">
-      <option value="0.5">0.5x</option>
-      <option value="1" selected>1x</option>
-      <option value="1.5">1.5x</option>
-      <option value="2">2x</option>
-      <option value="4">4x</option>
-    </select>
-    <label for="jumpInput">跳转到:</label>
-    <input type="text" id="jumpInput" placeholder="秒数或hh:mm:ss" style="width:100px;" />
-    <button id="jumpBtn">跳转</button>
+<!-- 词云弹窗 -->
+<div id="wordCloudOverlay">
+  <div id="wordCloudContainer">
+    <button id="closeWordCloudBtn">关闭</button>
+    <div id="copyMsg">词已复制</div>
   </div>
+</div>
 
-  <!-- Comment list container -->
-  <div id="commentContainer">
-    <ul id="commentList"></ul>
-  </div>
+<script>
+/**
+ * 全局数据结构：
+ *  - danmus:    加载后的弹幕数组 [{time: float, text: string}, ...]
+ *  - filtered:  搜索后的弹幕下标(或数据)
+ *  - searchMode/keywords: 记录搜索逻辑
+ *  - isPlaying, playbackSpeed: 播放状态与速度
+ *  - currentIndex: 当前播放到第几条(基于数组索引)
+ *
+ * 功能要点：
+ *  1. XML加载，默认过滤“哈哈”、“喝水” => 不进入danmus
+ *  2. 展示弹幕 + 词云 + 搜索 + 流式播放(按条数)
+ *  3. 折线图使用平滑(滑动平均) + 任意x点击跳转
+ */
 
-  <!-- Density line chart container -->
-  <div id="densityChart"></div>
+let danmus = [];        // 全部弹幕(已过滤dropWords)
+let isPlaying = false;
+let playbackSpeed = 2;  // 条/秒
+let currentIndex = 0;
+let playTimer = null;
+let userScrolling = false;
+let userScrollTimer = null;
 
-  <!-- Word Cloud Overlay -->
-  <div id="wordCloudOverlay">
-    <div id="wordCloud">
-      <button id="closeWordCloudBtn">关闭</button>
-      <div id="copyMsg">词已复制</div>
-    </div>
-  </div>
+let searchActive = false;       // 是否处于搜索模式
+let searchKeywords = [];
+let searchMode = 'OR';          // OR/AND
+let matchedIndices = [];        // 搜索匹配到的弹幕索引
 
-  <!-- Include ECharts and ECharts WordCloud via CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+// ECharts实例
+let chart = null;
+let chartOption = null;  // 用于更新
+let chartData = [];      // 平滑后的弹幕密度
+let maxTime = 0;
 
-  <script>
-    // Global data structures
-    let bulletList = [];        // Array of {time, text, textLower}
-    let chartDensity = null;    // ECharts instance for density chart
-    let densityDataFull = [];   // Full density data (counts per second)
-    let densityDataFiltered = [];// Filtered density data for search results
-    let wordCloudChart = null;  // ECharts instance for word cloud
-    let searchQueryLast = "";   // Last search query
-    let searchModeLast = "OR";  // Last search mode
+// Word Cloud
+let wcChart = null; // 词云图实例
 
-    // Playback state
-    let isPlaying = false;
-    let playbackSpeed = 1;
-    let currentTime = 0;
-    let currentIndex = 0;      // index in bulletList for next comment to show
-    let playInterval = null;
-    let autoScroll = true;
-    let programmaticScroll = false;
-    let autoScrollTimer = null;
+/**
+ * 初始化事件监听
+ */
+document.getElementById('loadFileBtn').addEventListener('click', loadFromFile);
+document.getElementById('loadUrlBtn').addEventListener('click', loadFromUrl);
 
-    // Stop words list (common meaningless words to filter out from word cloud)
-    const stopWords = new Set([
-      "的","了","和","是","我","你","他","她","它",
-      "吗","吧","啊","哦","嗯","在","也","不","就","都",
-      "也许","但是","因为","所以","如果",
-      " ", "",  // empty/space
-    ]);
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('exitSearchBtn').addEventListener('click', exitSearch);
 
-    // Utility: Parse time input (seconds or hh:mm:ss)
-    function parseTimeInput(input) {
-      input = input.trim();
-      if (!input) return null;
-      if (input.indexOf(":") >= 0) {
-        // Format with colon
-        let parts = input.split(":");
-        if (parts.length === 2) {
-          // mm:ss
-          let mm = parseInt(parts[0], 10);
-          let ss = parseInt(parts[1], 10);
-          if (isNaN(mm) || isNaN(ss)) return null;
-          return mm * 60 + ss;
-        } else if (parts.length === 3) {
-          // hh:mm:ss
-          let hh = parseInt(parts[0], 10);
-          let mm = parseInt(parts[1], 10);
-          let ss = parseInt(parts[2], 10);
-          if (isNaN(hh) || isNaN(mm) || isNaN(ss)) return null;
-          return hh * 3600 + mm * 60 + ss;
-        } else {
-          return null;
-        }
-      } else {
-        // Plain seconds
-        let sec = parseInt(input, 10);
-        return isNaN(sec) ? null : sec;
-      }
+document.getElementById('wordCloudBtn').addEventListener('click', showWordCloud);
+document.getElementById('closeWordCloudBtn').addEventListener('click', ()=> {
+  document.getElementById('wordCloudOverlay').style.display = 'none';
+});
+
+document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+document.getElementById('speedRange').addEventListener('input', onSpeedChange);
+document.getElementById('rewindBtn').addEventListener('click', rewind);
+
+document.getElementById('jumpBtn').addEventListener('click', doJump);
+
+document.getElementById('danmuContainer').addEventListener('scroll', onUserScroll);
+
+/**
+ * ============ 1. XML加载 & 默认drop过滤 ("哈哈","喝水") ============
+ */
+function loadFromFile(){
+  const fileInput = document.getElementById('xmlFile');
+  if (!fileInput.files.length) {
+    showError('请选择XML文件');
+    return;
+  }
+  clearError();
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    parseXmlString(e.target.result);
+  };
+  reader.onerror = () => {
+    showError('文件读取失败');
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function loadFromUrl(){
+  const url = document.getElementById('xmlUrl').value.trim();
+  if (!url) {
+    showError('请输入URL');
+    return;
+  }
+  clearError();
+  fetch(url)
+    .then(resp => {
+      if (!resp.ok) throw new Error('HTTP错误:'+resp.status);
+      return resp.text();
+    })
+    .then(txt => {
+      parseXmlString(txt);
+    })
+    .catch(e => {
+      showError('加载失败:'+ e.message);
+    });
+}
+
+function parseXmlString(xmlStr){
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlStr, 'application/xml');
+    if (xmlDoc.querySelector('parsererror')) {
+      throw new Error('XML格式不正确');
     }
+    // 提取 <d> 标签
+    const dList = xmlDoc.getElementsByTagName('d');
+    danmus = [];
+    const dropWords = document.getElementById('dropWords').value.split(',').map(w=>w.trim()).filter(Boolean);
 
-    // Utility: Format seconds to hh:mm:ss (for display if needed)
-    function formatTime(sec) {
-      let h = Math.floor(sec / 3600);
-      let m = Math.floor((sec % 3600) / 60);
-      let s = sec % 60;
-      return (h > 0 ? String(h).padStart(2,"0") + ":" : "") +
-             String(m).padStart(2,"0") + ":" +
-             String(s).padStart(2,"0");
-    }
-
-    // Load XML from text (called after file read or fetch)
-    function loadXmlData(xmlText) {
-      // Parse the XML text to a document
-      let parser = new DOMParser();
-      let xmlDoc;
-      try {
-        xmlDoc = parser.parseFromString(xmlText, "text/xml");
-      } catch (e) {
-        showError("XML解析失败。");
-        return;
+    for (let i=0; i<dList.length; i++){
+      const el = dList[i];
+      const p = el.getAttribute('p') || '';
+      const text = el.textContent.trim();
+      let timeSec = 0;
+      const parts = p.split(',');
+      if (parts.length>0) {
+        const t = parseFloat(parts[0]);
+        if (!isNaN(t)) timeSec = t;
       }
-      if (!xmlDoc) {
-        showError("XML解析失败。");
-        return;
-      }
-      // Extract <d> elements (assuming bilibili XML format)
-      const dElems = xmlDoc.getElementsByTagName("d");
-      bulletList = [];
-      for (let d of dElems) {
-        let pAttr = d.getAttribute("p");
-        let text = d.textContent || "";
-        if (!pAttr) continue;
-        // The first value in p attribute is the time in seconds (could be float)
-        let timeSec = parseFloat(pAttr.split(",")[0]);
-        if (isNaN(timeSec)) continue;
-        let time = Math.floor(timeSec);
-        bulletList.push({
-          time: time,
-          text: text,
-          textLower: text.toLowerCase()
-        });
-      }
-      // Sort bulletList by time (just in case it's not sorted)
-      bulletList.sort((a, b) => a.time - b.time);
-
-      // Build the comment list in the DOM
-      const ul = document.getElementById("commentList");
-      ul.innerHTML = "";  // clear any existing
-      for (let i = 0; i < bulletList.length; i++) {
-        const li = document.createElement("li");
-        li.innerHTML = `<span class="time">[${formatTime(bulletList[i].time)}]</span> ` +
-                       `<span class="text">${bulletList[i].text}</span>`;
-        li.addEventListener("click", () => {
-          // Click on a comment in list: jump to that time
-          jumpToTime(bulletList[i].time);
-        });
-        ul.appendChild(li);
-      }
-
-      // Prepare density chart data (full)
-      computeDensityFull();
-      renderDensityChart(densityDataFull);
-
-      // Prepare word cloud data
-      computeWordFrequencies();
-
-      // Reset playback state
-      resetPlayback();
-      // Clear any previous error message
-      showError(""); 
-
-      // If a previous search query exists (from a prior load), clear it
-      clearSearch();
-    }
-
-    // Compute full density data (counts per second for all comments)
-    function computeDensityFull() {
-      if (bulletList.length === 0) {
-        densityDataFull = [];
-        return;
-      }
-      let maxTime = bulletList[bulletList.length - 1].time;
-      densityDataFull = new Array(maxTime + 1).fill(0);
-      for (let bullet of bulletList) {
-        if (bullet.time >= 0 && bullet.time < densityDataFull.length) {
-          densityDataFull[bullet.time] += 1;
+      // 默认过滤掉包含 dropWords 的弹幕
+      let dropped = false;
+      for (let dw of dropWords) {
+        if (text.includes(dw)) { 
+          dropped = true; 
+          break; 
         }
       }
-    }
-
-    // Compute density data for filtered search results (based on searchQueryLast and searchModeLast)
-    function computeDensityFiltered(matches) {
-      // Create an array of same length as full density, filled with 0
-      densityDataFiltered = new Array(densityDataFull.length).fill(0);
-      for (let idx of matches) {
-        let t = bulletList[idx].time;
-        densityDataFiltered[t] += 1;
+      if (!dropped) {
+        danmus.push({time:timeSec, text});
       }
     }
 
-    // Initialize or update density chart with given data
-    function renderDensityChart(dataArray) {
-      const chartDiv = document.getElementById('densityChart');
-      if (!chartDensity) {
-        // initialize chart
-        chartDensity = echarts.init(chartDiv);
-        const option = {
-          tooltip: { trigger: 'axis' },
-          xAxis: {
-            type: 'category',
-            data: dataArray.map((_, i) => i),  // categories as seconds
-            axisLabel: {
-              formatter: function (value) {
-                // show as mm:ss
-                let sec = parseInt(value);
-                let m = Math.floor(sec/60), s = sec % 60;
-                return (m < 10 ? "0"+m : m) + ":" + (s < 10 ? "0"+s : s);
-              }
-            }
-          },
-          yAxis: { type: 'value', name: '弹幕数' },
-          series: [{
-            name: '弹幕密度',
-            type: 'line',
-            data: dataArray,
-            smooth: true,
-            areaStyle: {}
-          }]
-        };
-        chartDensity.setOption(option);
-        // Add click event for jumping to time
-        chartDensity.on('click', function(params) {
-          if (params && params.dataIndex != null) {
-            let sec = params.dataIndex;
-            jumpToTime(sec);
-          }
-        });
-      } else {
-        // update existing chart data
-        chartDensity.setOption({
-          series: [{ data: dataArray }]
-        });
-      }
-    }
+    // 按时间排序
+    danmus.sort((a,b) => a.time - b.time);
 
-    // Compute word frequencies and initialize word cloud (do this after loading)
-    let wordCloudData = [];
-    function computeWordFrequencies() {
-      const freq = new Map();
-      for (let bullet of bulletList) {
-        // Split text by non-alphanumeric/Chinese characters
-        let text = bullet.text;
-        // Replace punctuation with space
-        let words = text.replace(/[^\p{L}\p{N}]+/ug, ' ').trim().split(/\s+/);
-        for (let w of words) {
-          if (!w) continue;
-          // Filter out very short tokens (length 1) and stop words
-          if (w.length === 1 && stopWords.has(w)) continue;
-          if (stopWords.has(w.toLowerCase())) continue;
-          // Convert to lowercase for consistency (mostly for alphabetic words)
-          let key = w.toLowerCase();
-          freq.set(key, (freq.get(key) || 0) + 1);
-        }
-      }
-      // Sort by frequency and take top 100
-      wordCloudData = Array.from(freq.entries())
-                           .map(([name, value]) => ({ name, value }))
-                           .sort((a, b) => b.value - a.value)
-                           .slice(0, 100);
-      // Initialize word cloud chart if not already
-      if (!wordCloudChart) {
-        const wcDiv = document.getElementById('wordCloud');
-        wordCloudChart = echarts.init(wcDiv);
-        const option = {
-          tooltip: {},
-          series: [{
-            type: 'wordCloud',
-            gridSize: 8,
-            sizeRange: [12, 60],
-            rotationRange: [0, 0], // no rotation, all horizontal
-            textStyle: {
-              color: function() {
-                // random color for each word
-                return 'rgb(' + [
-                  Math.round(Math.random() * 160),
-                  Math.round(Math.random() * 160),
-                  Math.round(Math.random() * 160)
-                ].join(',') + ')';
-              }
-            },
-            data: wordCloudData
-          }]
-        };
-        wordCloudChart.setOption(option);
-        // Click event for copying word
-        wordCloudChart.on('click', function(params) {
-          if (params.data && params.data.name) {
-            copyToClipboard(params.data.name);
-          }
-        });
-      } else {
-        // Update data if chart already exists (e.g., reloading a new file)
-        wordCloudChart.setOption({
-          series: [{ data: wordCloudData }]
-        });
-      }
+    if (danmus.length===0) {
+      showError('弹幕为空或全部被过滤');
+    } else {
+      clearError();
     }
+    // 初始化UI
+    searchActive = false;
+    matchedIndices = [];
+    document.getElementById('searchResult').textContent = '无搜索';
+    resetPlayback();
+    renderDanmuList();
+    buildDensityData();
+    initChart();
 
-    // Copy text to clipboard (with fallback) and show confirmation
-    function copyToClipboard(text) {
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-          showCopyMessage();
-        }).catch(err => {
-          console.error("Clipboard copy failed:", err);
-          showCopyMessage();
-        });
-      } else {
-        // Fallback for older browsers
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-          document.execCommand('copy');
-        } catch (err) {
-          console.error("execCommand copy failed:", err);
-        }
-        document.body.removeChild(textarea);
-        showCopyMessage();
-      }
-    }
+    buildWordCloudData(); // 准备词云
+  } catch(e){
+    showError('XML解析失败: '+ e.message);
+  }
+}
 
-    function showCopyMessage() {
-      const msg = document.getElementById('copyMsg');
-      msg.style.display = 'block';
-      setTimeout(() => { msg.style.display = 'none'; }, 1500);
-    }
+function showError(msg){
+  document.getElementById('errorMsg').textContent = msg;
+}
+function clearError(){
+  document.getElementById('errorMsg').textContent = '';
+}
 
-    // Show or clear error message
-    function showError(msg) {
-      const errDiv = document.getElementById("errorMsg");
-      if (!msg) {
-        errDiv.style.display = "none";
-      } else {
-        errDiv.textContent = msg;
-        errDiv.style.display = "block";
-      }
-    }
-
-    // Reset playback state to beginning (called after loading a new XML)
-    function resetPlayback() {
-      clearInterval(playInterval);
-      isPlaying = false;
-      currentTime = 0;
-      currentIndex = 0;
-      document.getElementById("playPauseBtn").textContent = "播放";
-      // Remove any highlight
-      const listItems = document.querySelectorAll("#commentList li");
-      listItems.forEach(li => li.classList.remove("current"));
-      // Reset autoScroll
-      autoScroll = true;
-      programmaticScroll = false;
-    }
-
-    // Play/Pause toggle
-    function togglePlayPause() {
+/**
+ * ============ 2. 弹幕列表展示 & 搜索 =============
+ */
+function renderDanmuList(){
+  const container = document.getElementById('danmuContainer');
+  container.innerHTML = '';
+  for (let i=0; i<danmus.length; i++){
+    const div = document.createElement('div');
+    div.className = 'danmu-line';
+    div.dataset.idx = i;
+    // 简单显示 [MM:SS] 形式
+    let tStr = formatTime(danmus[i].time);
+    div.innerHTML = `[${tStr}] ${danmus[i].text}`;
+    div.addEventListener('click', () => {
+      // 如果点击某条弹幕 => 立即居中并从此开始播放
+      highlightAndCenter(i);
+      // 更新 currentIndex => i
+      currentIndex = i;
       if (!isPlaying) {
-        // Start playback
-        if (currentIndex >= bulletList.length) {
-          // If at end, restart
-          currentTime = 0;
-          currentIndex = 0;
+        // 若当前没在播，点完后直接开始播
+        togglePlay(true); // 强制播放
+      }
+    });
+    container.appendChild(div);
+  }
+}
+
+function doSearch(){
+  const kw = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!kw) {
+    showError('搜索关键词为空');
+    return;
+  }
+  clearError();
+  searchKeywords = kw.split(/\s+/).filter(Boolean);
+  searchMode = document.querySelector('input[name="searchMode"]:checked').value;  // AND / OR
+  searchActive = true;
+  matchedIndices = [];
+
+  for (let i=0; i<danmus.length; i++){
+    let textLow = danmus[i].text.toLowerCase();
+    let isMatch = false;
+    if (searchMode==='AND'){
+      // 所有关键词都要出现
+      isMatch = searchKeywords.every( w => textLow.includes(w) );
+    } else {
+      // OR
+      isMatch = searchKeywords.some( w => textLow.includes(w) );
+    }
+    if (isMatch) matchedIndices.push(i);
+  }
+
+  document.getElementById('searchResult').textContent = `搜索模式:${searchMode}, 共${matchedIndices.length}条匹配`;
+  // 更新折线图 => 只显示搜索结果的分布
+  buildDensityData(matchedIndices);  // 传入匹配索引 => 生成并刷新
+  updateChart();
+}
+
+function exitSearch(){
+  // 退出搜索，回到全部弹幕
+  searchActive = false;
+  matchedIndices = [];
+  searchKeywords = [];
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResult').textContent = '无搜索';
+  buildDensityData();  // 重建全部弹幕密度
+  updateChart();
+}
+
+/**
+ * ============ 3. 流式播放(按条数/秒) =============
+ */
+function togglePlay(forcePlay=false){
+  if (!danmus.length) return;
+  if (forcePlay){
+    // 强制变为播放
+    if (isPlaying) return;
+    isPlaying = true;
+  } else {
+    isPlaying = !isPlaying;
+  }
+  document.getElementById('playPauseBtn').textContent = isPlaying ? '暂停' : '播放';
+  if (isPlaying) {
+    // 开始定时器
+    let interval = 100; // ms
+    clearInterval(playTimer);
+    playTimer = setInterval(()=>{
+      // 每interval毫秒 => currentIndex向后推进 playbackSpeed*(interval/1000)
+      let inc = playbackSpeed * (interval / 1000);
+      // 不做时间换算，而是「1秒 N 条」，则 inc = speed*(interval/1000)
+      // 因为1秒播放speed条 => interval/1000秒播放 speed*(interval/1000)条
+
+      // 可能 inc < 1 => 我们积累 remainder直到>=1
+      // 这里简单起见：每次都累计 remainder
+      if (inc<1) {
+        // remainder计数
+        partialCount += inc;
+        while (partialCount>=1) {
+          partialCount -= 1;
+          showNextBullet();
         }
-        isPlaying = true;
-        document.getElementById("playPauseBtn").textContent = "暂停";
-        // Use a small interval tick for timing
-        let intervalMs = 100;
-        clearInterval(playInterval);
-        playInterval = setInterval(() => {
-          currentTime += (intervalMs / 1000) * playbackSpeed;
-          // While there are comments whose time <= currentTime, show them
-          while (currentIndex < bulletList.length && bulletList[currentIndex].time <= Math.floor(currentTime)) {
-            showComment(currentIndex);
-            currentIndex++;
-            if (currentIndex >= bulletList.length) break;
-          }
-          if (currentIndex >= bulletList.length) {
-            // reached end
-            clearInterval(playInterval);
-            isPlaying = false;
-            document.getElementById("playPauseBtn").textContent = "播放";
-          }
-        }, intervalMs);
       } else {
-        // Pause playback
-        isPlaying = false;
-        document.getElementById("playPauseBtn").textContent = "播放";
-        clearInterval(playInterval);
+        // inc>=1
+        for (let i=0; i<Math.floor(inc); i++){
+          showNextBullet();
+        }
+        partialCount += (inc - Math.floor(inc));
+        while(partialCount>=1){
+          partialCount -=1;
+          showNextBullet();
+        }
+      }
+    }, interval);
+  } else {
+    // 停止
+    clearInterval(playTimer);
+  }
+}
+let partialCount = 0; // 用于累加分数
+
+function showNextBullet(){
+  if (currentIndex>=danmus.length){
+    // 播放结束
+    clearInterval(playTimer);
+    isPlaying = false;
+    document.getElementById('playPauseBtn').textContent = '播放';
+    return;
+  }
+  highlightAndCenter(currentIndex);
+  currentIndex++;
+}
+
+function highlightAndCenter(idx){
+  // 去除旧的 current
+  const lines = document.querySelectorAll('#danmuContainer .danmu-line');
+  for (let l of lines) l.classList.remove('current');
+  if (idx<0 || idx>=lines.length) return;
+  const line = lines[idx];
+  line.classList.add('current');
+  if (!userScrolling){
+    // 如果用户并未手动滚动，则自动滚动
+    line.scrollIntoView({block:'center'});
+  }
+}
+
+function rewind(){
+  clearInterval(playTimer);
+  isPlaying = false;
+  partialCount = 0;
+  currentIndex = 0;
+  document.getElementById('playPauseBtn').textContent = '播放';
+  // 去掉所有高亮
+  let lines = document.querySelectorAll('#danmuContainer .danmu-line');
+  for (let l of lines) l.classList.remove('current');
+  if (lines.length>0) lines[0].scrollIntoView({block:'center'});
+}
+
+function onSpeedChange(){
+  let val = parseInt(document.getElementById('speedRange').value);
+  playbackSpeed = val;
+  document.getElementById('speedVal').textContent = val.toString();
+}
+
+/**
+ * 用户手动滚动 => 暂停自动滚动 5s
+ */
+function onUserScroll(){
+  userScrolling = true;
+  clearTimeout(userScrollTimer);
+  userScrollTimer = setTimeout(()=>{
+    userScrolling = false;
+  }, 5000);
+}
+
+/**
+ * ============ 4. 时间跳转 =============
+ */
+function doJump(){
+  let input = document.getElementById('timeJump').value.trim();
+  if (!input) return;
+  let sec = parseTime(input);
+  // 找到时间最接近 sec 的弹幕 => currentIndex
+  let idx = -1, minDiff=999999;
+  for (let i=0; i<danmus.length; i++){
+    let dSec = danmus[i].time;
+    let diff = Math.abs(dSec-sec);
+    if (diff<minDiff){
+      minDiff = diff;
+      idx = i;
+    }
+  }
+  if (idx>=0) {
+    highlightAndCenter(idx);
+    currentIndex = idx;
+    // 若当前没在播 => 播放
+    if (!isPlaying) togglePlay(true);
+  }
+}
+
+function parseTime(str){
+  if (/^\d+$/.test(str)) return parseInt(str);
+  // 00:02:00
+  let parts = str.split(':').map(a=>parseInt(a,10));
+  if (parts.length===2) {
+    return parts[0]*60+ parts[1];
+  } else if (parts.length===3){
+    return parts[0]*3600 + parts[1]*60 + parts[2];
+  }
+  return 0;
+}
+
+function formatTime(sec){
+  // 仅显示 MM:SS
+  let m = Math.floor(sec/60);
+  let s = Math.floor(sec%60);
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+/**
+ * ============ 5. 折线图(平滑 & 点击跳转) ============
+ */
+function buildDensityData(indices){
+  // 先确定maxTime
+  if (!danmus.length){
+    maxTime = 0; chartData=[]; return;
+  }
+  let lastSec = Math.ceil(danmus[danmus.length-1].time);
+  maxTime = lastSec;
+  let rawCounts = new Array(lastSec+1).fill(0);
+  if (indices && indices.length>0) {
+    // 用指定索引
+    for (let i of indices){
+      let t = Math.floor(danmus[i].time);
+      if (t>=0 && t<rawCounts.length) rawCounts[t]++;
+    }
+  } else if (searchActive) {
+    // 如果searchActive但indices为空 => 0
+    rawCounts = rawCounts; // all zero
+  } else {
+    // 全量
+    for (let d of danmus){
+      let t = Math.floor(d.time);
+      if (t>=0 && t<rawCounts.length) rawCounts[t]++;
+    }
+  }
+  // 平滑处理(滑动窗口大小=5秒)
+  let windowSize = 5;
+  chartData = new Array(rawCounts.length).fill(0);
+  for (let i=0; i<rawCounts.length; i++){
+    let sum=0, count=0;
+    for (let w=-2; w<=2; w++){
+      let idx = i+w;
+      if (idx>=0 && idx<rawCounts.length){
+        sum += rawCounts[idx];
+        count++;
       }
     }
+    chartData[i] = sum/count;
+  }
+}
 
-    // Highlight and center the comment at the given index
-    function showComment(index) {
-      const ul = document.getElementById("commentList");
-      const listItems = ul.getElementsByTagName("li");
-      if (!listItems[index]) return;
-      // Remove previous highlight
-      const prev = ul.querySelector("li.current");
-      if (prev) prev.classList.remove("current");
-      // Highlight this comment
-      const li = listItems[index];
-      li.classList.add("current");
-      // Auto-scroll into view if enabled
-      if (autoScroll) {
-        programmaticScroll = true;
-        li.scrollIntoView({ behavior: 'instant', block: 'center' });
+function initChart(){
+  const chartPanel = document.getElementById('chartPanel');
+  chart = echarts.init(chartPanel);
+  chartOption = {
+    tooltip: {
+      triggerOn: 'none', // 我们自定义点击
+    },
+    xAxis: {
+      type: 'value',
+      min: 0,
+      max: maxTime,
+      axisLabel: {
+        formatter: function(v){ 
+          let m = Math.floor(v/60), s=Math.floor(v%60);
+          return m+':'+(s<10?'0'+s:s);
+        }
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '弹幕数(平滑)',
+      min: 0,
+    },
+    series: [{
+      type: 'line',
+      data: [],
+      smooth: true,
+      areaStyle: {},
+      showSymbol: false,  // 不显示具体data点
+    }]
+  };
+  chart.setOption(chartOption);
+  // 监听点击(任意y位置)，计算x->time
+  chart.getZr().on('click', function(params){
+    let pointInPixel = [params.offsetX, params.offsetY];
+    // 将像素坐标转换成数值
+    let pointInGrid = chart.convertFromPixel({seriesIndex:0}, pointInPixel);
+    let xVal = pointInGrid[0]; 
+    if (xVal<0) xVal=0;
+    if (xVal>maxTime) xVal=maxTime;
+    // 跳转到此时间
+    // 找弹幕
+    let idx = -1, minDiff=999999;
+    for (let i=0; i<danmus.length; i++){
+      let diff = Math.abs(danmus[i].time - xVal);
+      if (diff<minDiff){
+        minDiff=diff; idx=i;
       }
     }
-
-    // Handle manual scroll events on comment list to enable/disable autoScroll
-    document.getElementById("commentContainer").addEventListener("scroll", () => {
-      if (programmaticScroll) {
-        // If this scroll was initiated by our code, ignore it
-        programmaticScroll = false;
-        return;
-      }
-      // User scrolled manually, disable autoScroll temporarily
-      autoScroll = false;
-      clearTimeout(autoScrollTimer);
-      autoScrollTimer = setTimeout(() => {
-        autoScroll = true;
-      }, 5000);
-    });
-
-    // Jump to a specific time (in seconds)
-    function jumpToTime(targetSec) {
-      if (bulletList.length === 0) return;
-      // Find the index of the first comment at or after targetSec
-      let idx = bulletList.findIndex(b => b.time >= targetSec);
-      if (idx === -1) {
-        idx = bulletList.length - 1; // if target beyond last comment, go to last
-      }
-      // Update playback state
-      currentTime = bulletList[idx].time;
+    if (idx>=0){
+      highlightAndCenter(idx);
       currentIndex = idx;
-      // Highlight that comment immediately
-      showComment(idx);
-      // If we were in search mode (filtered), leaving search to show full context
-      if (searchQueryLast && document.getElementById("backBtn").style.display === "none") {
-        // If currently showing filtered list, clear filter to show context
-        clearSearchFilter();
-        // Show back-to-search button
-        document.getElementById("backBtn").style.display = "inline-block";
+      if (!isPlaying) togglePlay(true);
+    }
+  });
+  updateChart();
+}
+
+function updateChart(){
+  if (!chart || !chartOption) return;
+  chartOption.xAxis.max = chartData.length-1;
+  chartOption.series[0].data = chartData.map((val, idx)=>[idx, val]);
+  chart.setOption(chartOption);
+}
+
+/**
+ * ============ 6. 词云(可关闭,点击复制) ============
+ */
+function buildWordCloudData(){
+  // 统计词频
+  let freqMap = {};
+  for (let d of danmus){
+    let txt = d.text;
+    // 去掉可能的重复串(例如"晚安晚安晚安...")
+    // 简易判断：若整句由某一子串重复 => 替换
+    // (这里可以做得更智能，这里仅示意)
+    txt = reduceRepeat(txt);
+
+    // 拆词(中英文混合，简单空格/非字母分割)
+    let words = txt.split(/[^A-Za-z0-9\u4e00-\u9fa5]+/).map(w=>w.trim()).filter(Boolean);
+    for (let w of words){
+      // 长度>4 丢弃
+      if (w.length>4) continue;
+      // 大写转小写(英文)
+      let wl = w.toLowerCase();
+      freqMap[wl] = (freqMap[wl]||0)+1;
+    }
+  }
+  // 转成数组并排序
+  let freqArr = Object.entries(freqMap).map(([name, value])=>({name, value}));
+  freqArr.sort((a,b)=> b.value - a.value);
+  // 取前100
+  freqArr = freqArr.slice(0,100);
+
+  // 初始化/更新词云
+  if (!wcChart){
+    wcChart = echarts.init(document.getElementById('wordCloudContainer'));
+    wcChart.on('click', function(params){
+      if (params.data && params.data.name){
+        copyToClipboard(params.data.name);
+      }
+    });
+  }
+  let wcOption = {
+    tooltip:{},
+    series: [{
+      type: 'wordCloud',
+      gridSize: 8,
+      sizeRange: [14, 60],
+      rotationRange: [0, 0],
+      textStyle:{
+        color: function(){
+          return 'rgb('+[
+            Math.round(Math.random()*160),
+            Math.round(Math.random()*160),
+            Math.round(Math.random()*160)
+          ].join(',')+')';
+        }
+      },
+      data: freqArr
+    }]
+  };
+  wcChart.setOption(wcOption);
+}
+
+// 判断字符串是否是重复片段(如"晚安晚安晚安") -> reduce
+function reduceRepeat(str){
+  // 简单场景: 若整句是某4字以内子串的重复 => 只留子串
+  // 例如 "晚安晚安晚安" => "晚安"
+  // 这里仅做示例，不保证覆盖所有情况
+  for (let len=1; len<=4; len++){
+    if (str.length%len===0){
+      let sub = str.slice(0, len);
+      // 重复N次?
+      let repeatCount = str.length/len;
+      if (sub.repeat(repeatCount)===str){
+        return sub;
       }
     }
+  }
+  return str;
+}
 
-    // Apply search filter based on current input and mode
-    function applySearch() {
-      const query = document.getElementById("searchInput").value.toLowerCase().trim();
-      const mode = document.querySelector("input[name='searchMode']:checked").value;
-      searchQueryLast = query;
-      searchModeLast = mode;
-      const listItems = document.querySelectorAll("#commentList li");
-      let matchIndices = [];
-      if (!query) {
-        // Empty query -> show all
-        listItems.forEach(li => li.classList.remove("hidden"));
-      } else {
-        const keywords = query.split(/\s+/).filter(k => k);
-        listItems.forEach((li, idx) => {
-          const text = bulletList[idx].textLower;
-          let isMatch;
-          if (mode === "AND") {
-            isMatch = keywords.every(kw => text.includes(kw));
-          } else { // OR
-            isMatch = keywords.some(kw => text.includes(kw));
-          }
-          if (isMatch) {
-            li.classList.remove("hidden");
-            matchIndices.push(idx);
-          } else {
-            li.classList.add("hidden");
-          }
-        });
-      }
-      // Update density chart for filtered results
-      if (!query) {
-        renderDensityChart(densityDataFull);
-      } else {
-        computeDensityFiltered(matchIndices);
-        renderDensityChart(densityDataFiltered);
-      }
-    }
+function showWordCloud(){
+  // 打开词云弹窗
+  if (!wcChart) return; // no data?
+  wcChart.resize();
+  document.getElementById('wordCloudOverlay').style.display = 'block';
+}
 
-    // Clear search filter and show full list (used when leaving search results)
-    function clearSearchFilter() {
-      const listItems = document.querySelectorAll("#commentList li");
-      listItems.forEach(li => li.classList.remove("hidden"));
-      renderDensityChart(densityDataFull);
-    }
-
-    // Clear search input and state (used when loading new XML or explicitly clearing search)
-    function clearSearch() {
-      document.getElementById("searchInput").value = "";
-      document.getElementById("andMode").checked = false;
-      document.getElementById("orMode").checked = true;
-      searchQueryLast = "";
-      searchModeLast = "OR";
-      document.getElementById("backBtn").style.display = "none";
-    }
-
-    // Event handlers for UI controls
-    document.getElementById("loadFileBtn").addEventListener("click", () => {
-      const fileInput = document.getElementById("fileInput");
-      if (fileInput.files.length === 0) {
-        showError("请选择一个XML文件。");
-        return;
-      }
-      const file = fileInput.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        loadXmlData(reader.result);
-      };
-      reader.onerror = () => {
-        showError("文件读取失败。");
-      };
-      reader.readAsText(file);
+function copyToClipboard(txt){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(()=>{
+      showCopyMsg();
+    }).catch(()=>{
+      fallbackCopy(txt);
     });
+  } else fallbackCopy(txt);
+}
+function fallbackCopy(txt){
+  const ta = document.createElement('textarea');
+  ta.value = txt;
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    document.execCommand('copy');
+    showCopyMsg();
+  } catch(e){}
+  document.body.removeChild(ta);
+}
+function showCopyMsg(){
+  const msg = document.getElementById('copyMsg');
+  msg.style.display = 'block';
+  setTimeout(()=>{ msg.style.display='none'; }, 1500);
+}
 
-    document.getElementById("loadUrlBtn").addEventListener("click", () => {
-      const url = document.getElementById("urlInput").value.trim();
-      if (!url) {
-        showError("请输入XML链接。");
-        return;
-      }
-      fetch(url).then(response => {
-        if (!response.ok) throw new Error("网络错误");
-        return response.text();
-      }).then(text => {
-        loadXmlData(text);
-      }).catch(err => {
-        console.error(err);
-        showError("XML加载失败，请检查链接或网络。");
-      });
-    });
-
-    document.getElementById("playPauseBtn").addEventListener("click", () => {
-      if (bulletList.length === 0) return;
-      togglePlayPause();
-    });
-
-    document.getElementById("speedSelect").addEventListener("change", (e) => {
-      playbackSpeed = parseFloat(e.target.value);
-    });
-
-    document.getElementById("jumpBtn").addEventListener("click", () => {
-      const val = document.getElementById("jumpInput").value;
-      const sec = parseTimeInput(val);
-      if (sec !== null) {
-        jumpToTime(sec);
-      }
-    });
-
-    document.getElementById("searchBtn").addEventListener("click", () => {
-      applySearch();
-      // Hide back-to-search button (new search resets context)
-      document.getElementById("backBtn").style.display = "none";
-    });
-
-    document.getElementById("backBtn").addEventListener("click", () => {
-      // Re-apply the last search filter (which should still be in input and radios)
-      applySearch();
-      // Hide the back button after returning to search view
-      document.getElementById("backBtn").style.display = "none";
-    });
-
-    document.getElementById("wordCloudBtn").addEventListener("click", () => {
-      if (!wordCloudChart) {
-        // If no word cloud data (perhaps no file loaded), do nothing
-        return;
-      }
-      // Show word cloud overlay
-      document.getElementById("wordCloudOverlay").style.display = "block";
-      // You may call resize on chart in case container size changed
-      wordCloudChart.resize();
-    });
-
-    document.getElementById("closeWordCloudBtn").addEventListener("click", () => {
-      document.getElementById("wordCloudOverlay").style.display = "none";
-    });
-  </script>
+</script>
 </body>
 </html>
