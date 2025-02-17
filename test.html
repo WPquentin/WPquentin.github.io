@@ -2,11 +2,12 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
-  <title>弹幕示例：搜索、跳转、流式、时间格式等功能</title>
+  <title>弹幕示例：搜索、跳转、流式、词云、密度图等</title>
   <style>
     body {
       margin: 0;
       font-family: sans-serif;
+      overflow: hidden; /* 防止出现多余滚动条，可根据需要调整 */
     }
     header, footer {
       padding: 10px;
@@ -15,8 +16,9 @@
     }
     main {
       display: flex;
-      height: calc(100vh - 100px); /* 减去header+footer大概高度 */
+      height: calc(100vh - 100px); /* 减去header+footer的高度，保证主体可自适应 */
     }
+
     /* 左侧面板 */
     #left-panel {
       width: 260px;
@@ -33,7 +35,7 @@
       margin-bottom: 10px;
     }
 
-    /* 弹幕列表区域 */
+    /* 中间弹幕列表 */
     #danmu-container {
       flex: 1;
       background: #fff;
@@ -45,44 +47,104 @@
     .danmu-line {
       margin: 3px 0;
       padding: 3px;
-      cursor: pointer;  /* 鼠标放上可点击 */
+      cursor: pointer;
       transition: background 0.1s;
     }
     .danmu-line:hover {
       background: #fafafa;
-    }
-    .danmu-line.highlighted {
-      background: #ffe58f;  /* 当前流式播放高亮 */
-      border-left: 3px solid #f90;
     }
     .time-label {
       color: #666;
       margin-right: 8px;
       font-size: 0.9em;
     }
+    /* 搜索关键词高亮 */
     .highlight {
-      background: yellow;  /* 搜索词高亮 */
+      background: yellow;
     }
 
-    /* 折叠的流式播放控制 */
+    /* 右侧折线图 & 密度条 */
+    #right-panel {
+      width: 320px;
+      border-left: 1px solid #ccc;
+      padding: 10px;
+      box-sizing: border-box;
+      background: #f9f9f9;
+      overflow-y: auto;
+    }
+    #chart-canvas {
+      border: 1px solid #ccc;
+      display: block;
+      background: #fff;
+      cursor: crosshair; /* 鼠标形状: 表示可点击 */
+    }
+    .density-wrapper {
+      position: relative;
+      width: 60px;
+      height: 300px;
+      margin: 10px auto;
+      cursor: crosshair;
+    }
+    #density-bar-all, #density-bar-search {
+      position: absolute;
+      top: 0; left: 0;
+      width: 60px;
+      height: 300px;
+    }
+    /* 默认：全部弹幕的条浅一点 */
+    #density-bar-all {
+      opacity: 0.3;
+    }
+    /* 搜索弹幕的条正常不透明 */
+    #density-bar-search {}
+
+    /* 流式控制面板 */
     #stream-controls {
       margin-top: 10px;
       padding: 10px;
       border: 1px solid #ccc;
       background: #fafafa;
-      display: none; /* 默认隐藏，点击“流式”按钮时展开 */
+      display: none; /* 默认隐藏，点击进入流式时显示 */
     }
+
+    /* 词频云的浮层（可点击按钮弹出） */
+    #word-cloud-overlay {
+      position: fixed;
+      top: 50px; /* header高度 */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 500px;
+      max-width: 90%;
+      max-height: 70%;
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 10px;
+      overflow: auto;
+      display: none; /* 默认隐藏 */
+      z-index: 999; /* 确保在上层 */
+    }
+    .cloud-word {
+      display: inline-block;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .close-cloud {
+      float: right;
+      cursor: pointer;
+      color: red;
+    }
+
   </style>
 </head>
 <body>
 <header>
-  <h1>弹幕示例</h1>
+  <h1>弹幕示例（满足所有改进需求）</h1>
 </header>
 
 <main>
-  <!-- 左侧面板：加载/搜索/跳转/流式/回到开头等 -->
+  <!-- 左侧面板：加载/搜索/跳转/流式/词云等 -->
   <div id="left-panel">
-    <!-- 1) 加载XML -->
+    <!-- 加载XML -->
     <div class="row">
       <h2>加载 XML</h2>
       <input type="file" id="xmlFile" accept=".xml"/><br/>
@@ -93,59 +155,97 @@
       <div id="errorMsg" style="color:red; margin-top:5px;"></div>
     </div>
 
-    <!-- 2) 搜索弹幕 -->
+    <!-- 搜索（多关键词 AND/OR） -->
     <div class="row">
       <h2>搜索</h2>
-      <input type="text" id="searchInput" placeholder="输入关键字" size="15"/>
-      <button onclick="doSearch()">搜索</button>
-      <button onclick="clearSearch()">重置</button>
+      <input type="text" id="searchInput" placeholder="输入关键字后按回车添加" size="15"
+             onkeydown="if(event.key==='Enter'){addSearchTerm();}" />
+      <button onclick="addSearchTerm()">添加</button>
+      <br/>
+      <label><input type="radio" name="searchMode" value="AND" checked>且(AND)</label>
+      <label><input type="radio" name="searchMode" value="OR">或(OR)</label>
+      <br/>
+      <!-- 显示当前搜索关键词 -->
+      <div id="searchTerms" style="margin-top:5px; color:blue; min-height:1.5em;"></div>
+      <button onclick="doSearch()">执行搜索</button>
+      <button onclick="clearSearch()">重置搜索</button>
+      <!-- 回到上次搜索结果按钮（默认隐藏） -->
+      <button id="btnReturnSearch" onclick="returnToSearch()" style="display:none;">回到搜索结果</button>
     </div>
 
-    <!-- 3) 时间跳转 -->
+    <!-- 时间跳转 -->
     <div class="row">
       <h2>时间跳转</h2>
       <input type="text" id="jumpTimeInput" placeholder="如 120 或 00:02:00" size="10"/>
       <button onclick="manualJump()">跳转</button>
     </div>
 
-    <!-- 4) 播放控制 (默认隐藏) -->
+    <!-- 流式播放按钮 -->
     <div class="row">
+      <button onclick="toggleFlowMode()" id="flowModeBtn">进入流式模式</button>
       <button onclick="rewind()">回到开头</button>
-      <button onclick="toggleStreamPanel()">流式</button>
     </div>
 
+    <!-- 流式控制面板 -->
     <div id="stream-controls">
-      <button onclick="startPlayback()">播放</button>
-      <button onclick="pausePlayback()">暂停</button>
-      <button onclick="resumePlayback()">恢复</button>
+      <button onclick="togglePlayPause()" id="playPauseBtn">播放</button>
       <br/><br/>
       <label>播放速度(毫秒/条)：</label>
-      <input type="range" id="speedRange" min="50" max="5000" step="50" value="1000" oninput="onSpeedChange()"/>
-      <span id="speedLabel">1000</span>
+      <input type="range" id="speedRange" min="100" max="1000" step="100" value="500" oninput="onSpeedChange()"/>
+      <span id="speedLabel">500</span>
+    </div>
+
+    <!-- 词频云按钮 -->
+    <div class="row">
+      <button onclick="toggleWordCloud()">词频云</button>
     </div>
   </div>
 
-  <!-- 弹幕显示 -->
+  <!-- 中间弹幕显示 -->
   <div id="danmu-container"></div>
+
+  <!-- 右侧：折线图 & 密度条 -->
+  <div id="right-panel">
+    <h2>弹幕量折线图</h2>
+    <canvas id="chart-canvas" width="300" height="150"></canvas>
+
+    <h2>密度颜色条</h2>
+    <div class="density-wrapper" id="densityWrapper">
+      <!-- 全部弹幕 -->
+      <div id="density-bar-all"></div>
+      <!-- 搜索结果 -->
+      <div id="density-bar-search"></div>
+    </div>
+  </div>
 </main>
 
 <footer>
   <p style="margin:0; text-align:center;">
-    仅作示例，支持：搜索/点击跳转、手动时间跳转、流式高亮、自动滚动居中
+    示例：搜索（多关键词 AND/OR）/点击搜索结果跳转/流式/词云/密度图等
   </p>
 </footer>
 
+<!-- 词频云的浮层 -->
+<div id="word-cloud-overlay">
+  <span class="close-cloud" onclick="toggleWordCloud()">[关闭]</span>
+  <h3>词频云</h3>
+  <div id="word-cloud-content">暂无数据</div>
+</div>
+
 <script>
+/** =============== 全局数据 =============== */
+let danmuData = [];         // 全部弹幕 {time, text}
+let filteredData = [];      // 当前显示的弹幕(可能是搜索后的)
+let lastSearchState = null; // 用来存储搜索状态，以便“回到搜索结果”
+let currentIndex = 0;       // 流式播放索引
+let isPlaying = false;      // 是否正在播放
+let playTimer = null;       // setInterval句柄
+let speed = 500;            // 播放速度(ms/条)
+let flowMode = false;       // 是否处于流式模式
+let userInteracting = false; // 用户是否在手动滚动/点击
+let userInteractTimer = null;
 
-/** ===================== 全局数据 ===================== */
-let danmuData = [];     // 原始弹幕 { time: number, text: string }
-let filteredData = [];  // 搜索之后保留的弹幕
-let currentIndex = 0;   // 流式播放当前索引
-let isPlaying = false;  // 是否在播放
-let timer = null;       // setInterval句柄
-let speed = 1000;       // 播放速度 ms/条
-
-// ========== 解析并加载XML  ==========
+/** =============== 加载XML =============== */
 function onLoadFile() {
   const fileInput = document.getElementById('xmlFile');
   const file = fileInput.files[0];
@@ -210,177 +310,258 @@ function handleXmlString(xmlStr) {
       }
       danmuData.push({ time: timeVal, text });
     }
+    // 按时间排序
+    danmuData.sort((a,b)=>a.time-b.time);
 
-    // 按时间升序
-    danmuData.sort((a,b) => a.time - b.time);
-    // 复制给 filteredData 并渲染
+    // 初始化
     filteredData = danmuData.slice();
-    resetPlayback();  // 会渲染全部弹幕
+    clearError();
     if (danmuData.length === 0) {
-      showError('XML中未找到任何弹幕');
-    } else {
-      clearError();
+      showError('未找到任何弹幕');
     }
+
+    // 渲染
+    resetPlayback();
+    // 更新图表(全部)
+    updateChartsAndDensity(danmuData, []);
+    // 构建词云数据
+    buildWordCloud(danmuData);
   } catch(err) {
     showError('XML处理失败: ' + err.message);
   }
 }
 
-// ========== 搜索 & 高亮点击跳转 ==========
-function doSearch() {
-  const kw = document.getElementById('searchInput').value.trim();
-  if (!kw) {
-    // 若关键词为空，则恢复全部
-    filteredData = danmuData.slice();
-    resetPlayback();
-    return;
-  }
-  filteredData = danmuData.filter(item => item.text.includes(kw));
-  resetPlayback();
-}
-function clearSearch() {
-  document.getElementById('searchInput').value = '';
-  filteredData = danmuData.slice();
-  resetPlayback();
+/** =============== 搜索(多关键词 AND/OR) =============== */
+let searchTermsArr = []; // 存储多关键词
+
+function addSearchTerm() {
+  const inp = document.getElementById('searchInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  searchTermsArr.push(val);
+  inp.value = '';
+  renderSearchTerms();
 }
 
-// ========== 手动时间跳转 ==========
+function renderSearchTerms() {
+  document.getElementById('searchTerms').textContent = `当前关键词：${searchTermsArr.join(' , ')}`;
+}
+
+function doSearch() {
+  if (searchTermsArr.length === 0) {
+    // 没有关键词就恢复全部
+    filteredData = danmuData.slice();
+    resetPlayback();
+    updateChartsAndDensity(danmuData, []);
+    return;
+  }
+  // 获取 AND / OR
+  let mode = 'AND';
+  const modeEls = document.getElementsByName('searchMode');
+  for (let el of modeEls) {
+    if (el.checked) {
+      mode = el.value;
+      break;
+    }
+  }
+
+  // 过滤
+  filteredData = danmuData.filter(d => {
+    if (mode === 'AND') {
+      return searchTermsArr.every(kw => d.text.includes(kw));
+    } else {
+      return searchTermsArr.some(kw => d.text.includes(kw));
+    }
+  });
+  resetPlayback();
+  // 更新图表(第二条数据传filtered，表示搜索分布)
+  updateChartsAndDensity(danmuData, filteredData);
+
+  // 存储搜索状态，用于“回到搜索结果”
+  lastSearchState = {
+    terms: [...searchTermsArr],
+    mode,
+    data: filteredData.slice()
+  };
+}
+
+function clearSearch() {
+  searchTermsArr = [];
+  document.getElementById('searchTerms').textContent = '';
+  filteredData = danmuData.slice();
+  resetPlayback();
+  updateChartsAndDensity(danmuData, []);
+  document.getElementById('btnReturnSearch').style.display = 'none';
+}
+
+function returnToSearch() {
+  if (!lastSearchState) return;
+  searchTermsArr = [...lastSearchState.terms];
+  // 恢复搜索模式
+  const modeEls = document.getElementsByName('searchMode');
+  for (let el of modeEls) {
+    el.checked = (el.value === lastSearchState.mode);
+  }
+  // 恢复过滤结果
+  filteredData = lastSearchState.data.slice();
+  resetPlayback();
+  // 图表
+  updateChartsAndDensity(danmuData, filteredData);
+  document.getElementById('btnReturnSearch').style.display = 'none';
+  renderSearchTerms();
+}
+
+/** =============== 时间跳转 =============== */
 function manualJump() {
   const val = document.getElementById('jumpTimeInput').value.trim();
   if (!val) return;
-  // 支持 "120" (秒) 或 "00:02:00" (时:分:秒)
   const secs = parseTimeString(val);
   jumpToTime(secs);
   document.getElementById('jumpTimeInput').value = '';
 }
 
-// 将形如 "00:01:10" 转换为总秒数
 function parseTimeString(str) {
-  // 如果只包含数字，则直接转换
+  // "120" 或 "00:02:00"
   if (/^\d+$/.test(str)) {
     return parseFloat(str);
   }
-  // 若包含冒号
   const parts = str.split(':').map(n=>parseFloat(n));
   let sec = 0;
   if (parts.length === 1) {
     sec = parts[0];
   } else if (parts.length === 2) {
-    // mm:ss
     sec = parts[0]*60 + parts[1];
   } else if (parts.length === 3) {
-    // hh:mm:ss
     sec = parts[0]*3600 + parts[1]*60 + parts[2];
   }
   return sec;
 }
 
-// ========== 时间格式化 hh:mm:ss ==========
+/** =============== 渲染弹幕列表 =============== */
+function renderAllDanmu() {
+  const container = document.getElementById('danmu-container');
+  container.innerHTML = '';
+
+  if (filteredData.length === 0) {
+    container.innerHTML = '<p>无弹幕</p>';
+    return;
+  }
+
+  filteredData.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'danmu-line';
+    div.innerHTML = `<span class="time-label">[${formatTime(item.time)}]</span> ${highlightText(item.text)}`;
+    div.addEventListener('click', () => {
+      // 点击后 => 切回全部弹幕 => 跳转到该时间 => 显示“回到搜索结果”按钮
+      const originalIdx = danmuData.findIndex(d => d.time===item.time && d.text===item.text);
+      if (originalIdx>=0) {
+        filteredData = danmuData.slice();
+        resetPlayback(false); // 不重置currentIndex=0
+        jumpToTime(danmuData[originalIdx].time);
+        // 显示回到搜索按钮(如果之前有搜索状态)
+        if (lastSearchState) {
+          document.getElementById('btnReturnSearch').style.display = 'inline-block';
+        }
+        updateChartsAndDensity(danmuData, []); // 全部模式
+      }
+    });
+    container.appendChild(div);
+  });
+}
+
+function highlightText(text) {
+  // 对多关键词都进行简单的替换
+  if (!searchTermsArr.length) return text;
+  let result = text;
+  searchTermsArr.forEach(kw=>{
+    result = result.split(kw).join(`<span class="highlight">${kw}</span>`);
+  });
+  return result;
+}
+
 function formatTime(sec) {
   if (!sec || sec<0) sec=0;
   const h = Math.floor(sec/3600);
   const m = Math.floor((sec%3600)/60);
   const s = Math.floor(sec%60);
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return [h,m,s].map(v=>String(v).padStart(2,'0')).join(':');
 }
 
-// ========== 弹幕容器渲染：默认显示全部 ==========
-function renderAllDanmu() {
-  const container = document.getElementById('danmu-container');
-  container.innerHTML = '';
-  if (filteredData.length === 0) {
-    container.innerHTML = '<p>无弹幕</p>';
-    return;
-  }
-  filteredData.forEach((item, idx) => {
-    const line = document.createElement('div');
-    line.className = 'danmu-line';
-    line.innerHTML = `<span class="time-label">[${formatTime(item.time)}]</span> ${highlightIfNeeded(item.text)}`;
-    // 点击跳转到该弹幕时间
-    line.addEventListener('click', () => {
-      jumpToTime(item.time);
-    });
-    container.appendChild(line);
-  });
-}
-
-// 搜索关键词高亮
-function highlightIfNeeded(text) {
-  const kw = document.getElementById('searchInput').value.trim();
-  if (!kw) return text;
-  // 简单的全部替换
-  return text.replaceAll(kw, `<span class="highlight">${kw}</span>`);
-}
-
-// ========== 时间跳转 (精准到 filteredData) ==========
+/** =============== jumpToTime =============== */
 function jumpToTime(targetSec) {
-  // 找到 filteredData 中 >= targetSec 的索引
-  const idx = filteredData.findIndex(d => d.time >= targetSec);
-  if (idx < 0) {
-    // 大于所有时间，则跳到最后
+  const idx = filteredData.findIndex(d => d.time>=targetSec);
+  if (idx<0) {
     currentIndex = filteredData.length;
   } else {
     currentIndex = idx;
   }
-  // 若已在流式播放，就重绘或先暂停
-  // 这里做简单处理：重绘并保持原播放状态
   renderAllDanmu();
   if (isPlaying) {
-    // 强制让下一条播放是 currentIndex
-    // highlightCurrent() 后也可自动滚动
-    highlightCurrent();
+    scrollCurrentIntoView();
   } else {
-    // 不在播放时，直接滚到那一条
     scrollToLine(currentIndex);
   }
 }
 
-// 滚动使第 idx 条在容器中央
 function scrollToLine(idx) {
   const container = document.getElementById('danmu-container');
-  const lineEls = container.getElementsByClassName('danmu-line');
-  if (idx < 0 || idx >= lineEls.length) return;
-  const line = lineEls[idx];
-  // 计算要滚动的偏移量
-  const containerRect = container.getBoundingClientRect();
-  const lineRect = line.getBoundingClientRect();
-  const offset = (lineRect.top + lineRect.height/2) - (containerRect.top + containerRect.height/2);
+  const lines = container.getElementsByClassName('danmu-line');
+  if (idx<0 || idx>=lines.length) return;
+  const line = lines[idx];
+  const cRect = container.getBoundingClientRect();
+  const lRect = line.getBoundingClientRect();
+  const offset = (lRect.top + lRect.height/2) - (cRect.top + cRect.height/2);
   container.scrollTop += offset;
 }
 
-// ========== 流式播放功能 ==========
-// 默认只显示一个“回到开头”和“流式”按钮
-// 当点击“流式”时才展开其它播放按钮
-
-function toggleStreamPanel() {
+/** =============== 流式播放 =============== */
+function toggleFlowMode() {
+  const btn = document.getElementById('flowModeBtn');
   const panel = document.getElementById('stream-controls');
-  if (panel.style.display === 'none') {
+  flowMode = !flowMode;
+  if (flowMode) {
+    btn.textContent = '关闭流式模式';
     panel.style.display = 'block';
   } else {
+    btn.textContent = '进入流式模式';
     panel.style.display = 'none';
+    // 停止流式播放
+    stopTimer();
+    isPlaying = false;
+    document.getElementById('playPauseBtn').textContent = '播放';
   }
 }
 
-function startPlayback() {
-  // 每次点击播放，先从头开始
-  resetPlayback();
-  if (filteredData.length === 0) {
-    showError('无弹幕可播放');
+function togglePlayPause() {
+  const btn = document.getElementById('playPauseBtn');
+  if (!isPlaying) {
+    // 开始播放
+    if (currentIndex>=filteredData.length) currentIndex=0;
+    isPlaying = true;
+    btn.textContent = '暂停';
+    playTimer = setInterval(playNext, speed);
+  } else {
+    // 暂停
+    isPlaying = false;
+    btn.textContent = '继续';
+    stopTimer();
+  }
+}
+
+function playNext() {
+  if (currentIndex>=filteredData.length) {
+    stopTimer();
+    isPlaying = false;
+    document.getElementById('playPauseBtn').textContent = '播放';
     return;
   }
-  isPlaying = true;
-  timer = setInterval(playNext, speed);
+  scrollCurrentIntoView();
+  currentIndex++;
 }
 
-function pausePlayback() {
-  isPlaying = false;
-  stopTimer();
-}
-
-function resumePlayback() {
-  if (!isPlaying && currentIndex < filteredData.length) {
-    isPlaying = true;
-    timer = setInterval(playNext, speed);
+function scrollCurrentIntoView() {
+  if (!userInteracting) {
+    scrollToLine(currentIndex);
   }
 }
 
@@ -388,73 +569,244 @@ function rewind() {
   resetPlayback();
 }
 
-function resetPlayback() {
+/** =============== resetPlayback =============== */
+function resetPlayback(resetIndex=true) {
   stopTimer();
   isPlaying = false;
-  currentIndex = 0;
+  document.getElementById('playPauseBtn').textContent = '播放';
+  if (resetIndex) currentIndex=0;
   renderAllDanmu();
-}
-
-// 每次播放一条
-function playNext() {
-  if (currentIndex >= filteredData.length) {
-    stopTimer();
-    isPlaying = false;
-    return;
-  }
-  highlightCurrent();
-  currentIndex++;
-}
-
-// 高亮当前弹幕 & 使其滚动到容器中央
-function highlightCurrent() {
-  const container = document.getElementById('danmu-container');
-  const lineEls = container.getElementsByClassName('danmu-line');
-  // 先清除所有highlighted
-  for (let el of lineEls) {
-    el.classList.remove('highlighted');
-  }
-  if (currentIndex < 0 || currentIndex >= lineEls.length) return;
-  const targetLine = lineEls[currentIndex];
-  targetLine.classList.add('highlighted');
   scrollToLine(currentIndex);
 }
 
+/** =============== stopTimer =============== */
 function stopTimer() {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
+  if (playTimer) {
+    clearInterval(playTimer);
+    playTimer = null;
   }
 }
 
-// ========== 速度调节 ==========
+/** =============== speed range =============== */
 function onSpeedChange() {
   const val = document.getElementById('speedRange').value;
-  speed = parseInt(val, 10);
+  speed = parseInt(val,10);
   document.getElementById('speedLabel').textContent = speed;
   if (isPlaying) {
-    // 停止原定时器，重新启动
     stopTimer();
-    timer = setInterval(playNext, speed);
+    playTimer = setInterval(playNext, speed);
   }
 }
 
-// ========== 播放重置时的默认渲染(显示全部) ==========
-function resetPlayback() {
-  stopTimer();
-  isPlaying = false;
-  currentIndex = 0;
-  renderAllDanmu();
+/** =============== 用户滚动/点击 => 延时自动回滚 =============== */
+const danmuContainer = document.getElementById('danmu-container');
+danmuContainer.addEventListener('scroll', onUserInteract);
+danmuContainer.addEventListener('mousedown', onUserInteract);
+function onUserInteract() {
+  userInteracting = true;
+  if (userInteractTimer) clearTimeout(userInteractTimer);
+  // 3秒后若无进一步操作 => userInteracting = false
+  userInteractTimer = setTimeout(()=>{
+    userInteracting=false;
+  }, 3000);
 }
 
-// ========== 工具函数: 错误提示 ==========
-function showError(msg) {
+/** =============== 词频云 =============== */
+function toggleWordCloud() {
+  const overlay = document.getElementById('word-cloud-overlay');
+  if (overlay.style.display==='none' || !overlay.style.display) {
+    overlay.style.display = 'block';
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+// 简易停用词示例（可自行扩展）
+const stopWords = new Set(['的','了','在','是','我','也','和','就','都','你','吧','啊','吗','呢','嘛']);
+
+function buildWordCloud(data) {
+  // 统计词频（非常简单的分割方式）
+  const freqMap = new Map();
+  data.forEach(item=>{
+    const words = item.text.split(/[\s,.\?!;，。！？；]/).filter(Boolean);
+    words.forEach(w=>{
+      if (!stopWords.has(w) && w.length<30) {
+        freqMap.set(w, (freqMap.get(w)||0)+1);
+      }
+    });
+  });
+  // 排序取前50
+  const arr = [...freqMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,50);
+  const container = document.getElementById('word-cloud-content');
+  container.innerHTML = '';
+  arr.forEach(([word,count])=>{
+    const span = document.createElement('span');
+    span.className='cloud-word';
+    span.textContent=word;
+    // fontSize随count变化
+    const fontSize = Math.min(14 + count, 40); // 防止过大
+    span.style.fontSize = fontSize+'px';
+    span.onclick = ()=>{
+      navigator.clipboard.writeText(word)
+        .then(()=>alert(`词已复制：${word}`))
+        .catch(()=>alert('复制失败'));
+    };
+    container.appendChild(span);
+  });
+}
+
+/** =============== 折线图 & 密度条(可点击) =============== */
+/**
+ * @param {Array} allData 全部弹幕
+ * @param {Array} searchData 搜索弹幕
+ */
+function updateChartsAndDensity(allData, searchData) {
+  // 先构建分桶(每60秒一个桶，仅做示例)
+  if (!allData.length) {
+    drawLineChart([], [], 0);
+    drawDensityBar([], [], 0);
+    return;
+  }
+  const maxTime = allData[allData.length-1].time;
+  const binSize = 60;
+  const allBins = buildDistribution(allData, binSize);
+  const searchBins = buildDistribution(searchData, binSize);
+
+  // 绘制折线图(把maxTime传过去，以便计算坐标)
+  drawLineChart(allBins, searchBins, maxTime);
+  // 绘制密度条
+  drawDensityBar(allBins, searchBins, maxTime);
+}
+
+/** 分桶统计: time => 每隔binSize秒一个区间 */
+function buildDistribution(data, binSize) {
+  if (!data.length) return [];
+  const maxT = data[data.length-1].time;
+  const binsCount = Math.ceil(maxT/binSize)+1;
+  const bins = [];
+  for (let i=0;i<binsCount;i++){
+    bins.push({x: i*binSize, count:0});
+  }
+  data.forEach(d=>{
+    const i = Math.floor(d.time/binSize);
+    if (bins[i]) bins[i].count++;
+  });
+  return bins;
+}
+
+function drawLineChart(allBins, searchBins, maxTime) {
+  const canvas = document.getElementById('chart-canvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  // 坐标系 & 边距
+  const padding = 30;
+  const innerW = w - padding*2;
+  const innerH = h - padding*2;
+
+  // 找到最大count
+  const maxCountAll = allBins.length? Math.max(...allBins.map(b=>b.count)) : 0;
+  const maxCountSearch = searchBins.length? Math.max(...searchBins.map(b=>b.count)) : 0;
+  const maxCount = Math.max(maxCountAll, maxCountSearch);
+
+  // 绘制坐标轴
+  ctx.strokeStyle='#333';
+  ctx.beginPath();
+  ctx.moveTo(padding, h-padding);
+  ctx.lineTo(w-padding, h-padding); // x轴
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(padding, h-padding);   // y轴
+  ctx.stroke();
+
+  // 画全部弹幕线(浅色)
+  ctx.strokeStyle='rgba(0,0,200,0.3)';
+  ctx.beginPath();
+  allBins.forEach((bin,i)=>{
+    const xRatio = bin.x/(maxTime||1);
+    const yRatio = bin.count/(maxCount||1);
+    const xPos = padding + xRatio*innerW;
+    const yPos = (h-padding) - yRatio*innerH;
+    if(i===0) ctx.moveTo(xPos,yPos);
+    else ctx.lineTo(xPos,yPos);
+  });
+  ctx.stroke();
+
+  // 画搜索弹幕线(深色)
+  if (searchBins.length>0) {
+    ctx.strokeStyle='rgba(255,0,0,0.8)';
+    ctx.beginPath();
+    searchBins.forEach((bin,i)=>{
+      const xRatio = bin.x/(maxTime||1);
+      const yRatio = bin.count/(maxCount||1);
+      const xPos = padding + xRatio*innerW;
+      const yPos = (h-padding) - yRatio*innerH;
+      if(i===0) ctx.moveTo(xPos,yPos);
+      else ctx.lineTo(xPos,yPos);
+    });
+    ctx.stroke();
+  }
+
+  // 点击事件 => 根据x坐标推算时间
+  canvas.onclick = (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    // 判断是否在绘图区域
+    if(cx<padding || cx> w-padding) return;
+    if(cy<padding || cy> h-padding) return;
+    // x => time
+    const xRatio = (cx - padding)/innerW;
+    const clickTime = xRatio*maxTime;
+    jumpToTime(clickTime);
+  };
+}
+
+/** 绘制密度条 => 两个div叠加，点击可跳转 */
+function drawDensityBar(allBins, searchBins, maxTime) {
+  const wrap = document.getElementById('densityWrapper');
+  const barAll = document.getElementById('density-bar-all');
+  const barSearch = document.getElementById('density-bar-search');
+
+  if (!allBins.length) {
+    barAll.style.background='';
+    barSearch.style.background='';
+    // 清理点击
+    wrap.onclick=null;
+    return;
+  }
+
+  // 用线性渐变：从下到上
+  // 根据最大count确定最深颜色(这里简单用红)
+  const maxCountAll = Math.max(...allBins.map(b=>b.count));
+  const maxCountSearch = searchBins.length? Math.max(...searchBins.map(b=>b.count)) : 0;
+  // 这里只是演示：全部弹幕用红色(低透明) => search用红色(高透明)
+  // 实际可以更精细的分段渐变
+  barAll.style.background='linear-gradient(to top, rgba(255,0,0,0.3), #fff)';
+  if (searchBins.length>0) {
+    barSearch.style.background='linear-gradient(to top, rgba(255,0,0,0.8), #fff)';
+  } else {
+    barSearch.style.background=''; // 无搜索数据时不显示
+  }
+
+  // 点击 => 根据点击高度 => time
+  wrap.onclick = (e)=>{
+    const rect = wrap.getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    const ratio = 1 - (clickY/rect.height); // 0~1，从下往上
+    const clickTime = ratio*maxTime;
+    jumpToTime(clickTime);
+  };
+}
+
+/** =============== 工具函数 =============== */
+function showError(msg){
   document.getElementById('errorMsg').textContent = msg;
 }
-function clearError() {
+function clearError(){
   document.getElementById('errorMsg').textContent = '';
 }
 </script>
-
 </body>
 </html>
