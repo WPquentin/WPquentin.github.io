@@ -3,9 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>URL to QR Code</title>
-  <!-- 引入 QRCode.js 库 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <title>纯内嵌 URL 转 QR Code</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -39,12 +37,8 @@
       border-radius: 4px;
       cursor: pointer;
     }
-    button:hover {
-      background: #45a049;
-    }
-    #qrcode {
-      margin-top: 20px;
-    }
+    button:hover { background: #45a049; }
+    #qrcode { margin-top: 20px; }
     #download {
       display: none;
       margin-top: 10px;
@@ -54,23 +48,29 @@
       color: white;
       border-radius: 4px;
     }
-    #download:hover {
-      background: #1976D2;
-    }
+    #download:hover { background: #1976D2; }
   </style>
 </head>
 <body>
   <div id="container">
-    <h2>URL to QR Code</h2>
+    <h2>纯内嵌 URL 转 QR Code</h2>
     <div>
-      <input id="text" type="text" placeholder="Your URL here" />
-      <button id="generate">Generate QR code</button>
+      <input id="text" type="text" placeholder="请输入 URL" />
+      <button id="generate">生成二维码</button>
     </div>
     <div id="qrcode"></div>
-    <a id="download" download="qrcode.png">Download QR code</a>
+    <a id="download" download="qrcode.png">下载二维码</a>
   </div>
 
+  <!-- 完全内嵌 QRCode.js 库 -->
   <script>
+  /*! QRCode.js v1.0.0 开始 */
+  /* 将 qrcode.min.js 文件全部内容粘贴到此处 */
+  /*! QRCode.js v1.0.0 结束 */
+  </script>
+
+  <script>
+    // 业务逻辑：生成并下载二维码
     const input = document.getElementById('text');
     const btn   = document.getElementById('generate');
     const box   = document.getElementById('qrcode');
@@ -79,34 +79,25 @@
     btn.addEventListener('click', () => {
       const url = input.value.trim();
       if (!url) {
-        alert('Please enter a valid URL');
+        alert('请输入有效的 URL');
         return;
       }
-      // 清空旧的二维码和下载链接
       box.innerHTML = '';
       downloadLink.style.display = 'none';
 
-      // 生成新的二维码
       new QRCode(box, {
         text: url,
         width: 256,
         height: 256,
-        colorDark : '#000000',
-        colorLight: '#ffffff',
+        colorDark : '#000',
+        colorLight: '#fff',
         correctLevel : QRCode.CorrectLevel.H
       });
 
-      // 等待二维码渲染完毕后，设置下载链接
       setTimeout(() => {
-        // QRCode.js 会插入一个 <img> 或 <canvas>
         const img = box.querySelector('img') || box.querySelector('canvas');
-        let dataURL;
         if (!img) return;
-        if (img.tagName === 'CANVAS') {
-          dataURL = img.toDataURL('image/png');
-        } else {
-          dataURL = img.src;
-        }
+        const dataURL = (img.tagName === 'CANVAS') ? img.toDataURL('image/png') : img.src;
         downloadLink.href = dataURL;
         downloadLink.style.display = 'inline-block';
       }, 100);
