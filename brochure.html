@@ -8,8 +8,7 @@
     html, body { margin:0; padding:0; height:100%; overflow:hidden; perspective:2000px; background:#f0f0f0; }
     #controls { position:absolute; top:10px; left:10px; z-index:10; display:flex; align-items:center; gap:10px; }
     #file-input { }
-    #file-info { font-family:sans-serif; }
-    .delete-icon { cursor:pointer; margin-left:5px; color:#c00; }
+    .delete-icon { cursor:pointer; color:#c00; display:none; font-size:1.2rem; }
     #status { position:absolute; top:50px; left:50%; transform:translateX(-50%);
       background:rgba(255,255,255,0.9); padding:5px 10px; border-radius:4px;
       font-family:sans-serif; z-index:10; }
@@ -25,7 +24,7 @@
 <body>
   <div id="controls">
     <input id="file-input" type="file" accept="application/pdf" />
-    <div id="file-info"></div>
+    <span id="delete-icon" class="delete-icon" title="Clear file">🗑️</span>
   </div>
   <div id="status">Please upload your brochure</div>
   <div id="brochure-wrapper"><div id="brochure"></div></div>
@@ -39,7 +38,7 @@
     let panelImages = {}, state = 0, panelW, panelH;
 
     const input = document.getElementById('file-input');
-    const fileInfo = document.getElementById('file-info');
+    const deleteIcon = document.getElementById('delete-icon');
     const status = document.getElementById('status');
     const wrapper = document.getElementById('brochure-wrapper');
     const brochure = document.getElementById('brochure');
@@ -48,8 +47,7 @@
       const file = input.files[0];
       if (!file) return;
       
-      fileInfo.innerHTML = `${file.name}<span class="delete-icon">🗑️</span>`;
-      document.querySelector('.delete-icon').addEventListener('click', reset);
+      deleteIcon.style.display = 'inline';
 
       status.textContent = 'Loading...';
       const data = new Uint8Array(await file.arrayBuffer());
@@ -59,7 +57,6 @@
         return;
       }
       status.textContent = 'Rendering...';
-      // Rendering
       for (const num in mapping) {
         const [pg, idx] = mapping[num];
         const page = await pdf.getPage(pg);
@@ -77,6 +74,8 @@
       state = 0; showState();
       status.textContent = 'Cover: click to unfold';
     });
+
+    deleteIcon.addEventListener('click', reset);
 
     function showState() {
       brochure.innerHTML = '';
@@ -113,9 +112,8 @@
     }
 
     function reset() {
-      // Clear
       input.value = '';
-      fileInfo.textContent = '';
+      deleteIcon.style.display = 'none';
       brochure.innerHTML = '';
       status.textContent = 'Please upload your brochure';
       panelImages = {};
