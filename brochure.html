@@ -46,7 +46,7 @@
         panelImages[num]=slice.toDataURL();
       }
       wrapper.style.width=panelW*3+'px'; wrapper.style.height=panelH+'px'; state=0; showState();
-      status.textContent='Cover';
+      status.textContent='Cover: click to unfold';
     });
     function showState(){
       brochure.innerHTML=''; states[state].forEach(n=>{
@@ -68,7 +68,7 @@
       if(valid) nextState();
     });
     function nextState(){ state=(state+1)%states.length; showState();
-      const hints=['Unfold','Unfold','Rotate','Fold','Fold','Rotate'];
+      const hints=['Click to unfold','Click to unfold','Click to rotate','Click to fold','Click to fold','Click to rotate'];
       status.textContent=hints[state]; }
   </script>
 </body>
