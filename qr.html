@@ -45,6 +45,18 @@
     #qrcode {
       margin-top: 20px;
     }
+    #download {
+      display: none;
+      margin-top: 10px;
+      text-decoration: none;
+      padding: 8px 16px;
+      background: #2196F3;
+      color: white;
+      border-radius: 4px;
+    }
+    #download:hover {
+      background: #1976D2;
+    }
   </style>
 </head>
 <body>
@@ -55,12 +67,14 @@
       <button id="generate">生成二维码</button>
     </div>
     <div id="qrcode"></div>
+    <a id="download" download="qrcode.png">下载二维码</a>
   </div>
 
   <script>
     const input = document.getElementById('text');
     const btn   = document.getElementById('generate');
     const box   = document.getElementById('qrcode');
+    const downloadLink = document.getElementById('download');
 
     btn.addEventListener('click', () => {
       const url = input.value.trim();
@@ -68,8 +82,10 @@
         alert('请输入一个有效的 URL');
         return;
       }
-      // 清空旧的二维码
+      // 清空旧的二维码和下载链接
       box.innerHTML = '';
+      downloadLink.style.display = 'none';
+
       // 生成新的二维码
       new QRCode(box, {
         text: url,
@@ -78,7 +94,22 @@
         colorDark : '#000000',
         colorLight: '#ffffff',
         correctLevel : QRCode.CorrectLevel.H
-n      });
+      });
+
+      // 等待二维码渲染完毕后，设置下载链接
+      setTimeout(() => {
+        // QRCode.js 会插入一个 <img> 或 <canvas>
+        const img = box.querySelector('img') || box.querySelector('canvas');
+        let dataURL;
+        if (!img) return;
+        if (img.tagName === 'CANVAS') {
+          dataURL = img.toDataURL('image/png');
+        } else {
+          dataURL = img.src;
+        }
+        downloadLink.href = dataURL;
+        downloadLink.style.display = 'inline-block';
+      }, 100);
     });
   </script>
 </body>
