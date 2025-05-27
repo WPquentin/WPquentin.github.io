@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Trifold Brochure</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    #upload {
+      margin-bottom: 20px;
+    }
+    #brochure {
+      perspective: 1000px;
+      width: 100%;
+      max-width: 900px;
+      margin: auto;
+    }
+    .side {
+      display: flex;
+      margin-bottom: 40px;
+    }
+    .panel {
+      flex: 1;
+      border: 1px solid #ccc;
+      overflow: hidden;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s;
+      transform-origin: left center;
+      cursor: pointer;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .panel:nth-child(3) {
+      transform-origin: right center;
+    }
+    .panel.folded {
+      transform: rotateY(-90deg);
+    }
+    canvas {
+      width: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="upload" accept="application/pdf" />
+  <div id="brochure"></div>
+
+  <!-- Include PDF.js library -->
+  <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+  <script>
+    const upload = document.getElementById('upload');
+    const brochure = document.getElementById('brochure');
+
+    upload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+
+      reader.onload = function() {
+        const pdfData = new Uint8Array(this.result);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js';
+
+        pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
+          brochure.innerHTML = '';
+
+          // Loop through the two pages of the PDF
+          for (let pageNum = 1; pageNum <= 2; pageNum++) {
+            pdf.getPage(pageNum).then(page => {
+              const viewport = page.getViewport({ scale: 1.5 });
+              const fullCanvas = document.createElement('canvas');
+              const ctx = fullCanvas.getContext('2d');
+
+              fullCanvas.width = viewport.width;
+              fullCanvas.height = viewport.height;
+
+              page.render({ canvasContext: ctx, viewport }).promise.then(() => {
+                // Split the rendered page into 3 equal-width panels
+                const panelWidth = fullCanvas.width / 3;
+                const sideDiv = document.createElement('div');
+                sideDiv.className = 'side';
+
+                for (let i = 0; i < 3; i++) {
+                  const panelDiv = document.createElement('div');
+                  panelDiv.className = 'panel';
+
+                  // Toggle fold on click
+                  panelDiv.addEventListener('click', () => {
+                    panelDiv.classList.toggle('folded');
+                  });
+
+                  const canvas = document.createElement('canvas');
+                  canvas.width = panelWidth;
+                  canvas.height = fullCanvas.height;
+                  const cctx = canvas.getContext('2d');
+
+                  // Draw the slice of the page onto the panel canvas
+                  cctx.drawImage(
+                    fullCanvas,
+                    i * panelWidth, 0,
+                    panelWidth, fullCanvas.height,
+                    0, 0,
+                    panelWidth, fullCanvas.height
+                  );
+
+                  panelDiv.appendChild(canvas);
+                  sideDiv.appendChild(panelDiv);
+                }
+
+                brochure.appendChild(sideDiv);
+              });
+            });
+          }
+        });
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  </script>
+</body>
+</html>
