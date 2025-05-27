@@ -4,12 +4,77 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Home - WP Quentin</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f7fa;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .tools {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 30px;
+    }
+    .card {
+      flex: 1 1 250px;
+      max-width: 300px;
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-decoration: none;
+      color: inherit;
+      padding: 20px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .card p {
+      margin: 0;
+      font-size: 1rem;
+      color: #555;
+    }
+    @media (max-width: 600px) {
+      .tools {
+        flex-direction: column;
+        gap: 15px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Tools</h1>
-  <p>Trifold: </p>
-  <p><a href="https://wpquentin.github.io/brochure.html">Brochure</a></p><br>
-  <p>QR: </p>
-  <p><a href="https://wpquentin.github.io/qr.html">Codes</a></p>
+  <div class="container">
+    <h1>Tools</h1>
+    <div class="tools">
+      <a class="card" href="https://wpquentin.github.io/brochure.html">
+        <h2>Trifold Brochure</h2>
+        <p>Interactive PDF trifold brochure viewer</p>
+      </a>
+      <a class="card" href="https://wpquentin.github.io/qr.html">
+        <h2>QR Code Generator</h2>
+        <p>Generate and download custom QR codes</p>
+      </a>
+    </div>
+  </div>
 </body>
 </html>
