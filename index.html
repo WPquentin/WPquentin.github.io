@@ -2,147 +2,136 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Interactive Trifold Brochure</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
+      font-family: sans-serif;
       padding: 20px;
-      background: #f9f9f9;
+      background: #f0f0f0;
     }
-    #upload {
-      margin-bottom: 20px;
+    #file-input {
+      margin-bottom: 1em;
     }
-    #brochure {
-      perspective: 1000px;
-      width: 100%;
-      max-width: 900px;
-      margin: auto;
+    #status {
+      margin-bottom: 1em;
+      color: #333;
     }
-    .side {
+    .brochure-container {
+      margin-bottom: 3em;
+    }
+    .brochure-container h2 {
+      margin: 0.5em 0;
+    }
+    .brochure {
       display: flex;
-      margin-bottom: 40px;
+      perspective: 2000px;
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
     }
     .panel {
-      flex: 1;
-      border: 1px solid #ccc;
-      overflow: hidden;
       position: relative;
-      transform-style: preserve-3d;
-      transition: transform 0.6s;
+      backface-visibility: hidden;
+      background-size: cover;
+      background-position: center;
+      transition: transform 1s;
       cursor: pointer;
-      background: white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .panel:nth-child(1), .panel:nth-child(2) {
-      transform-origin: left center;
-    }
-    .panel:nth-child(3) {
-      transform-origin: right center;
-    }
-    .panel.folded {
-      transform: rotateY(-90deg);
-    }
-    canvas {
-      width: 100%;
-      display: block;
-    }
-    #console {
-      margin-top: 20px;
-      color: #555;
-      font-size: 0.9em;
-      white-space: pre-wrap;
-    }
+    /* 折叠折叠效果和各面 Transform 原点 */
+    .panel:nth-child(1) { transform-origin: right center; }
+    .panel:nth-child(3) { transform-origin: left center; }
+    .folded-right { transform: rotateY(150deg); }
+    .folded-left  { transform: rotateY(-150deg); }
   </style>
 </head>
 <body>
-  <input type="file" id="upload" accept="application/pdf" />
-  <div id="brochure"></div>
-  <div id="console"></div>
+  <input type="file" id="file-input" accept="application/pdf" />
+  <div id="status">请选择一个两页 PDF 文件。</div>
 
-  <!-- Include PDF.js from CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.202/build/pdf.min.js"></script>
+  <div class="brochure-container">
+    <h2>正面 (Front)</h2>
+    <div id="brochure-front" class="brochure"></div>
+  </div>
+  <div class="brochure-container">
+    <h2>背面 (Back)</h2>
+    <div id="brochure-back" class="brochure"></div>
+  </div>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
-    const log = msg => {
-      document.getElementById('console').textContent += msg + '\n';
-      console.log(msg);
-    };
-    
-    const upload = document.getElementById('upload');
-    const brochure = document.getElementById('brochure');
+    const input = document.getElementById('file-input');
+    const status = document.getElementById('status');
+    const front = document.getElementById('brochure-front');
+    const back  = document.getElementById('brochure-back');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    upload.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      brochure.innerHTML = '';
-      document.getElementById('console').textContent = '';
-      if (!file) {
-        log('No file selected.');
-        return;
+    input.addEventListener('change', async () => {
+      front.innerHTML = '';
+      back.innerHTML  = '';
+      const file = input.files[0];
+      if (!file) return;
+      status.textContent = '读取文件，将加载 PDF…';
+      const arrayBuffer = await file.arrayBuffer();
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        if (pdf.numPages < 2) {
+          status.textContent = 'PDF 必须至少包含两页。';
+          return;
+        }
+        status.textContent = 'PDF 加载成功，共 ' + pdf.numPages + ' 页。正在渲染…';
+        // 渲染第 1 页为正面，第 2 页为背面
+        await renderPage(pdf, 1, front);
+        await renderPage(pdf, 2, back);
+        status.textContent = '渲染完成！点击左右两边面板即可折叠/展开。';
+      } catch (e) {
+        console.error(e);
+        status.textContent = '加载 PDF 时出错：' + e.message;
       }
-      log('Reading file: ' + file.name);
-      const reader = new FileReader();
-
-      reader.onerror = () => log('FileReader error: ' + reader.error);
-      reader.onload = function() {
-        log('File read as ArrayBuffer, loading PDF...');
-        const pdfData = new Uint8Array(this.result);
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.202/build/pdf.worker.min.js';
-        
-        pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
-          log('PDF loaded, pages: ' + pdf.numPages);
-          if (pdf.numPages < 2) log('Warning: PDF has less than 2 pages.');
-          // Render first two pages (or fewer if less)
-          const pagesToRender = Math.min(2, pdf.numPages);
-          for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
-            pdf.getPage(pageNum).then(page => {
-              const scale = 1.5;
-              const viewport = page.getViewport({ scale });
-              const fullCanvas = document.createElement('canvas');
-              const ctx = fullCanvas.getContext('2d');
-
-              fullCanvas.width = viewport.width;
-              fullCanvas.height = viewport.height;
-
-              log('Rendering page ' + pageNum + ' at scale ' + scale);
-              page.render({ canvasContext: ctx, viewport }).promise.then(() => {
-                log('Page ' + pageNum + ' rendered.');
-                const panelWidth = fullCanvas.width / 3;
-                const sideDiv = document.createElement('div');
-                sideDiv.className = 'side';
-
-                for (let i = 0; i < 3; i++) {
-                  const panelDiv = document.createElement('div');
-                  panelDiv.className = 'panel';
-                  panelDiv.addEventListener('click', () => panelDiv.classList.toggle('folded'));
-
-                  const canvas = document.createElement('canvas');
-                  canvas.width = panelWidth;
-                  canvas.height = fullCanvas.height;
-                  const cctx = canvas.getContext('2d');
-
-                  cctx.drawImage(
-                    fullCanvas,
-                    i * panelWidth, 0,
-                    panelWidth, fullCanvas.height,
-                    0, 0,
-                    panelWidth, fullCanvas.height
-                  );
-
-                  panelDiv.appendChild(canvas);
-                  sideDiv.appendChild(panelDiv);
-                }
-                brochure.appendChild(sideDiv);
-              }).catch(err => log('Render error on page ' + pageNum + ': ' + err));
-            }).catch(err => log('Failed to get page ' + pageNum + ': ' + err));
-          }
-        }).catch(err => log('Error loading PDF: ' + err));
-      };
-
-      reader.readAsArrayBuffer(file);
     });
+
+    async function renderPage(pdf, pageNum, container) {
+      const page = await pdf.getPage(pageNum);
+      // 根据页面宽度缩放
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      // 渲染整页到临时 Canvas
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width  = viewport.width;
+      tmpCanvas.height = viewport.height;
+      const ctx = tmpCanvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // 每页切成 3 个面板
+      const panelWidth  = Math.floor(tmpCanvas.width / 3);
+      const panelHeight = tmpCanvas.height;
+      for (let i = 0; i < 3; i++) {
+        // 切割子 Canvas
+        const panelCanvas = document.createElement('canvas');
+        panelCanvas.width  = panelWidth;
+        panelCanvas.height = panelHeight;
+        const pctx = panelCanvas.getContext('2d');
+        pctx.drawImage(
+          tmpCanvas,
+          i * panelWidth, 0, panelWidth, panelHeight,
+          0, 0, panelWidth, panelHeight
+        );
+        // 生成面板 DIV
+        const div = document.createElement('div');
+        div.className = 'panel';
+        div.style.width  = panelWidth + 'px';
+        div.style.height = panelHeight + 'px';
+        div.style.backgroundImage = `url(${panelCanvas.toDataURL()})`;
+        // 点击折叠/展开
+        if (i === 0) {
+          div.addEventListener('click', () => div.classList.toggle('folded-right'));
+        } else if (i === 2) {
+          div.addEventListener('click', () => div.classList.toggle('folded-left'));
+        }
+        container.appendChild(div);
+      }
+    }
   </script>
 </body>
 </html>
-
