@@ -31,10 +31,12 @@
       position: relative;
       transform-style: preserve-3d;
       transition: transform 0.6s;
-      transform-origin: left center;
       cursor: pointer;
       background: white;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .panel:nth-child(1), .panel:nth-child(2) {
+      transform-origin: left center;
     }
     .panel:nth-child(3) {
       transform-origin: right center;
@@ -46,42 +48,66 @@
       width: 100%;
       display: block;
     }
+    #console {
+      margin-top: 20px;
+      color: #555;
+      font-size: 0.9em;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
   <input type="file" id="upload" accept="application/pdf" />
   <div id="brochure"></div>
+  <div id="console"></div>
 
-  <!-- Include PDF.js library -->
-  <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+  <!-- Include PDF.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.202/build/pdf.min.js"></script>
   <script>
+    const log = msg => {
+      document.getElementById('console').textContent += msg + '\n';
+      console.log(msg);
+    };
+    
     const upload = document.getElementById('upload');
     const brochure = document.getElementById('brochure');
 
     upload.addEventListener('change', (e) => {
       const file = e.target.files[0];
-      if (!file) return;
+      brochure.innerHTML = '';
+      document.getElementById('console').textContent = '';
+      if (!file) {
+        log('No file selected.');
+        return;
+      }
+      log('Reading file: ' + file.name);
       const reader = new FileReader();
 
+      reader.onerror = () => log('FileReader error: ' + reader.error);
       reader.onload = function() {
+        log('File read as ArrayBuffer, loading PDF...');
         const pdfData = new Uint8Array(this.result);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://mozilla.github.io/pdf.js/build/pdf.worker.js';
-
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.202/build/pdf.worker.min.js';
+        
         pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
-          brochure.innerHTML = '';
-
-          // Loop through the two pages of the PDF
-          for (let pageNum = 1; pageNum <= 2; pageNum++) {
+          log('PDF loaded, pages: ' + pdf.numPages);
+          if (pdf.numPages < 2) log('Warning: PDF has less than 2 pages.');
+          // Render first two pages (or fewer if less)
+          const pagesToRender = Math.min(2, pdf.numPages);
+          for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
             pdf.getPage(pageNum).then(page => {
-              const viewport = page.getViewport({ scale: 1.5 });
+              const scale = 1.5;
+              const viewport = page.getViewport({ scale });
               const fullCanvas = document.createElement('canvas');
               const ctx = fullCanvas.getContext('2d');
 
               fullCanvas.width = viewport.width;
               fullCanvas.height = viewport.height;
 
+              log('Rendering page ' + pageNum + ' at scale ' + scale);
               page.render({ canvasContext: ctx, viewport }).promise.then(() => {
-                // Split the rendered page into 3 equal-width panels
+                log('Page ' + pageNum + ' rendered.');
                 const panelWidth = fullCanvas.width / 3;
                 const sideDiv = document.createElement('div');
                 sideDiv.className = 'side';
@@ -89,18 +115,13 @@
                 for (let i = 0; i < 3; i++) {
                   const panelDiv = document.createElement('div');
                   panelDiv.className = 'panel';
-
-                  // Toggle fold on click
-                  panelDiv.addEventListener('click', () => {
-                    panelDiv.classList.toggle('folded');
-                  });
+                  panelDiv.addEventListener('click', () => panelDiv.classList.toggle('folded'));
 
                   const canvas = document.createElement('canvas');
                   canvas.width = panelWidth;
                   canvas.height = fullCanvas.height;
                   const cctx = canvas.getContext('2d');
 
-                  // Draw the slice of the page onto the panel canvas
                   cctx.drawImage(
                     fullCanvas,
                     i * panelWidth, 0,
@@ -112,12 +133,11 @@
                   panelDiv.appendChild(canvas);
                   sideDiv.appendChild(panelDiv);
                 }
-
                 brochure.appendChild(sideDiv);
-              });
-            });
+              }).catch(err => log('Render error on page ' + pageNum + ': ' + err));
+            }).catch(err => log('Failed to get page ' + pageNum + ': ' + err));
           }
-        });
+        }).catch(err => log('Error loading PDF: ' + err));
       };
 
       reader.readAsArrayBuffer(file);
@@ -125,3 +145,4 @@
   </script>
 </body>
 </html>
+
