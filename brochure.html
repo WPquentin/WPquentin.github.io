@@ -25,67 +25,51 @@
   <div id="brochure-wrapper"><div id="brochure"></div></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     const mapping = {1:[1,2],2:[2,0],3:[1,0],4:[2,1],5:[2,2],6:[1,1]};
-    // 6 states: cover, open1, open3, rotate, fold3, fold1
-    const states = [
-      [0,1,0],  // cover
-      [2,3,0],  // open 1
-      [2,4,5],  // open 3
-      [3,6,1],  // rotate
-      [0,6,1],  // fold 3
-      [0,6,0]   // fold 1
-    ];
-    let panelImages = {}, state = 0, panelW, panelH;
-    const input = document.getElementById('file-input');
-    const status = document.getElementById('status');
-    const wrapper = document.getElementById('brochure-wrapper');
-    const brochure = document.getElementById('brochure');
-    input.addEventListener('change', async () => {
-      status.textContent = '载入 PDF...';
-      const file = input.files[0]; if(!file) return;
-      const data = new Uint8Array(await file.arrayBuffer());
-      const pdf = await pdfjsLib.getDocument({data}).promise;
+    const states = [ [0,1,0], [2,3,0], [2,4,5], [3,6,1], [0,6,1], [0,6,0] ];
+    let panelImages={}, state=0, panelW, panelH;
+    const input=document.getElementById('file-input'), status=document.getElementById('status');
+    const wrapper=document.getElementById('brochure-wrapper'), brochure=document.getElementById('brochure');
+    input.addEventListener('change', async ()=>{
+      status.textContent='载入 PDF...'; const file=input.files[0]; if(!file) return;
+      const data=new Uint8Array(await file.arrayBuffer()); const pdf=await pdfjsLib.getDocument({data}).promise;
       if(pdf.numPages<2){ status.textContent='PDF 需至少两页。'; return; }
       status.textContent='渲染面板...';
-      for(const num in mapping){
-        const [pg,idx] = mapping[num];
-        const page = await pdf.getPage(pg);
-        const vp = page.getViewport({scale:1.5});
-        panelW = Math.floor(vp.width/3); panelH = vp.height;
-        const tmp = document.createElement('canvas'); tmp.width=vp.width; tmp.height=vp.height;
+      for(const num in mapping){ const [pg,idx]=mapping[num];
+        const page=await pdf.getPage(pg); const vp=page.getViewport({scale:1.5});
+        panelW=Math.floor(vp.width/3); panelH=vp.height;
+        const tmp=document.createElement('canvas'); tmp.width=vp.width; tmp.height=vp.height;
         await page.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise;
-        const slice = document.createElement('canvas'); slice.width=panelW; slice.height=panelH;
-        slice.getContext('2d').drawImage(tmp, idx*panelW,0,panelW,panelH, 0,0,panelW,panelH);
-        panelImages[num] = slice.toDataURL();
+        const slice=document.createElement('canvas'); slice.width=panelW; slice.height=panelH;
+        slice.getContext('2d').drawImage(tmp, idx*panelW,0,panelW,panelH,0,0,panelW,panelH);
+        panelImages[num]=slice.toDataURL();
       }
-      wrapper.style.width = panelW*3+'px'; wrapper.style.height = panelH+'px';
-      state = 0; showState(); status.textContent='点击封面(1)开始';
+      wrapper.style.width=panelW*3+'px'; wrapper.style.height=panelH+'px'; state=0; showState();
+      status.textContent='点击封面(1)开始';
     });
     function showState(){
-      brochure.innerHTML='';
-      states[state].forEach(n=>{
-        const d=document.createElement('div');
-        d.className='panel'+(n==0?' empty':'');
+      brochure.innerHTML=''; states[state].forEach(n=>{
+        const d=document.createElement('div'); d.className='panel'+(n==0?' empty':'');
         d.style.width=panelW+'px'; d.style.height=panelH+'px';
         if(n){ const img=document.createElement('img'); img.src=panelImages[n]; d.appendChild(img); }
         d.dataset.idx=n; brochure.appendChild(d);
       });
     }
     wrapper.addEventListener('click', e=>{
-      const d=e.target.closest('.panel'); if(!d) return;
-      const idx=d.dataset.idx;
-      const valid = (state===0&&idx=='1')||(state===1&&idx=='3')||(state===2)||
-                    (state===3&&idx=='3')||(state===4&&idx=='1')||(state===5&&idx=='6');
-      if(valid) next();
+      const d=e.target.closest('.panel'); if(!d) return; const idx=d.dataset.idx;
+      const valid =
+        (state===0 && idx==='1') ||
+        (state===1 && idx==='3') ||
+        (state===2) ||
+        (state===3 && idx==='3') ||
+        (state===4 && idx==='1') ||
+        (state===5);
+      if(valid) nextState();
     });
-    function next(){
-      if(state===5) state=1; else state=(state+1)%states.length;
-      showState();
+    function nextState(){ state=(state+1)%states.length; showState();
       const hints=['封面','打开 1','打开 3','旋转','折叠 3','折叠 1'];
-      status.textContent=hints[state];
-    }
+      status.textContent=hints[state]; }
   </script>
 </body>
 </html>
