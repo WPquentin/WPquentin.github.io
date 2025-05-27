@@ -1,22 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interactive Trifold Brochure</title>
   <style>
     body { font-family: sans-serif; margin: 20px; background: #f0f0f0; }
     #file-input { margin-bottom: 1em; }
     #status { margin-bottom: 1em; color: #333; }
-    #brochure { display: flex; justify-content: center; align-items: center; height: 80vh; }
+    #brochure {
+      display: flex;
+      overflow-x: auto;
+      align-items: center;
+      height: 80vh;
+    }
     .panel {
-      width: 200px; /* placeholder, resized later */
-      height: auto;
-      margin: 0 2px;
-      background-size: cover;
-      background-position: center;
+      flex: none;
+      margin: 0 5px;
       cursor: pointer;
       transition: transform 0.5s;
+      position: relative;
+    }
+    .panel img {
+      display: block;
+      max-height: 100%;
+      height: auto;
+      width: auto;
     }
   </style>
 </head>
@@ -31,112 +40,95 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    const mapping = { // maps panel number to [pageIndex(1-based), sliceIdx(0-2)]
-      1: [1,2],
-      2: [2,0],
-      3: [1,0],
-      4: [2,1],
-      5: [2,2],
-      6: [1,1]
-    };
-    const states = [
-      [1],      // initial cover
-      [2,3],    // after 1 open
-      [2,4,5],  // after 3 open
-      [3,6,1],  // rotate
-      [6,1],    // after 3 fold
-      [6],      // after 1 fold
-      [1]       // rotate back
-    ];
-    let panelImages = {};
-    let state = 0;
+    // 面板映射：编号->[页码, 切片索引]
+    const mapping = {1:[1,2], 2:[2,0], 3:[1,0], 4:[2,1], 5:[2,2], 6:[1,1]};
+    // 七个状态下要显示的面板序列
+    const states = [[1],[2,3],[2,4,5],[3,6,1],[6,1],[6],[1]];
+    let panelImages = {}, state = 0;
 
     document.getElementById('file-input').addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
       document.getElementById('status').textContent = '载入 PDF…';
-      const data = new Uint8Array(await file.arrayBuffer());
+      const array = await file.arrayBuffer();
+      const data = new Uint8Array(array);
       const pdf = await pdfjsLib.getDocument({ data }).promise;
       if (pdf.numPages < 2) {
-        document.getElementById('status').textContent = 'PDF 必须至少两页。';
+        document.getElementById('status').textContent = 'PDF 必须至少包含两页。';
         return;
       }
       document.getElementById('status').textContent = '渲染所有面板…';
-      // render all six panels ahead of time
+      // 预渲染 1-6 面板
       for (const num of Object.keys(mapping)) {
         const [pg, idx] = mapping[num];
         const page = await pdf.getPage(pg);
-        const vp = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: 1.5 });
         const tmp = document.createElement('canvas');
-        tmp.width = vp.width;
-        tmp.height = vp.height;
-        await page.render({ canvasContext: tmp.getContext('2d'), viewport: vp }).promise;
-        const pw = Math.floor(vp.width / 3);
-        const ph = vp.height;
+        tmp.width = viewport.width;
+        tmp.height = viewport.height;
+        await page.render({ canvasContext: tmp.getContext('2d'), viewport }).promise;
+
+        const panelWidth = Math.floor(viewport.width / 3);
+        const panelHeight = viewport.height;
         const slice = document.createElement('canvas');
-        slice.width = pw;
-        slice.height = ph;
-        const sctx = slice.getContext('2d');
-        sctx.drawImage(tmp, idx * pw, 0, pw, ph, 0, 0, pw, ph);
+        slice.width = panelWidth;
+        slice.height = panelHeight;
+        slice.getContext('2d').drawImage(
+          tmp,
+          idx * panelWidth, 0,
+          panelWidth, panelHeight,
+          0, 0,
+          panelWidth, panelHeight
+        );
         panelImages[num] = slice.toDataURL();
       }
-      document.getElementById('status').textContent = '准备就绪，点击封面开始。';
       state = 0;
       showState();
+      document.getElementById('status').textContent = '点击封面（1），按照提示进行交互。';
     });
 
     function showState() {
-      const view = states[state];
-      const cont = document.getElementById('brochure');
-      cont.innerHTML = '';
-      for (const num of view) {
+      const container = document.getElementById('brochure');
+      container.innerHTML = '';
+      states[state].forEach(num => {
         const div = document.createElement('div');
         div.className = 'panel';
         div.dataset.index = num;
-        div.style.backgroundImage = `url(${panelImages[num]})`;
-        div.style.width = '200px';
-        div.style.height = '300px';
-        cont.appendChild(div);
-      }
+        const img = document.createElement('img');
+        img.src = panelImages[num];
+        div.appendChild(img);
+        container.appendChild(div);
+      });
     }
 
     document.getElementById('brochure').addEventListener('click', e => {
-      const idx = e.target.dataset.index;
-      switch(state) {
-        case 0:
-          if (idx === '1') next();
-          break;
-        case 1:
-          if (idx === '3') next();
-          break;
-        case 2:
-          next(); // rotate
-          break;
-        case 3:
-          if (idx === '3') next();
-          break;
-        case 4:
-          if (idx === '1') next();
-          break;
-        case 5:
-          next(); // rotate back
-          break;
+      const panel = e.target.closest('.panel');
+      if (!panel) return;
+      const idx = panel.dataset.index;
+      // 各状态的触发规则
+      if ((state === 0 && idx === '1') ||
+          (state === 1 && idx === '3') ||
+          (state === 2) ||
+          (state === 3 && idx === '3') ||
+          (state === 4 && idx === '1') ||
+          (state === 5)) {
+        nextState();
       }
     });
 
-    function next() {
+    function nextState() {
       state = (state + 1) % states.length;
       showState();
-      const msgs = [
-        '封面 (1)',
-        '打开封面，显示 2 和 3',
-        '打开展页，显示 2、4、5',
-        '旋转到正面，显示 3、6、1',
-        '折叠左页，显示 6 和 1',
-        '折叠右页，显示 6',
-        '旋转回初始，显示 1'
+      const hints = [
+        '封面 1',
+        '打开 1 → 显示 2,3',
+        '打开 3 → 显示 2,4,5',
+        '旋转 → 显示 3,6,1',
+        '折叠 3 → 显示 6,1',
+        '折叠 1 → 显示 6',
+        '旋转回初始 → 显示 1'
       ];
-      document.getElementById('status').textContent = msgs[state];
+      document.getElementById('status').textContent = hints[state];
     }
   </script>
 </body>
