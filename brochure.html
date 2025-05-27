@@ -21,7 +21,7 @@
 </head>
 <body>
   <input id="file-input" type="file" accept="application/pdf" />
-  <div id="status">Your PDF here</div>
+  <div id="status">请选择两页 PDF。</div>
   <div id="brochure-wrapper"><div id="brochure"></div></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
@@ -32,10 +32,10 @@
     const input=document.getElementById('file-input'), status=document.getElementById('status');
     const wrapper=document.getElementById('brochure-wrapper'), brochure=document.getElementById('brochure');
     input.addEventListener('change', async ()=>{
-      status.textContent='Loading PDF...'; const file=input.files[0]; if(!file) return;
+      status.textContent='载入 PDF...'; const file=input.files[0]; if(!file) return;
       const data=new Uint8Array(await file.arrayBuffer()); const pdf=await pdfjsLib.getDocument({data}).promise;
-      if(pdf.numPages<2){ status.textContent='PDF at least 2 pages。'; return; }
-      status.textContent='Rendering...';
+      if(pdf.numPages<2){ status.textContent='PDF 需至少两页。'; return; }
+      status.textContent='渲染面板...';
       for(const num in mapping){ const [pg,idx]=mapping[num];
         const page=await pdf.getPage(pg); const vp=page.getViewport({scale:1.5});
         panelW=Math.floor(vp.width/3); panelH=vp.height;
@@ -46,7 +46,7 @@
         panelImages[num]=slice.toDataURL();
       }
       wrapper.style.width=panelW*3+'px'; wrapper.style.height=panelH+'px'; state=0; showState();
-      status.textContent='Open the cover';
+      status.textContent='点击封面(1)开始';
     });
     function showState(){
       brochure.innerHTML=''; states[state].forEach(n=>{
@@ -68,8 +68,8 @@
       if(valid) nextState();
     });
     function nextState(){ state=(state+1)%states.length; showState();
-      // const hints=['Over','Open left','Open right','Rotate','Fold left','Fold right'];
-      // status.textContent=hints[state]; }
+      const hints=['封面','打开 1','打开 3','旋转','折叠 3','折叠 1'];
+      status.textContent=hints[state]; }
   </script>
 </body>
 </html>
