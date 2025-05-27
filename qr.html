@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL 转 QR Code</title>
+  <!-- 引入 QRCode.js 库 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    #container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    input {
+      width: 300px;
+      padding: 8px;
+      margin-right: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      padding: 8px 16px;
+      font-size: 14px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #qrcode {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h2>URL 转 QR Code</h2>
+    <div>
+      <input id="text" type="text" placeholder="请输入或粘贴 URL" />
+      <button id="generate">生成二维码</button>
+    </div>
+    <div id="qrcode"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('text');
+    const btn   = document.getElementById('generate');
+    const box   = document.getElementById('qrcode');
+
+    btn.addEventListener('click', () => {
+      const url = input.value.trim();
+      if (!url) {
+        alert('请输入一个有效的 URL');
+        return;
+      }
+      // 清空旧的二维码
+      box.innerHTML = '';
+      // 生成新的二维码
+      new QRCode(box, {
+        text: url,
+        width: 256,
+        height: 256,
+        colorDark : '#000000',
+        colorLight: '#ffffff',
+        correctLevel : QRCode.CorrectLevel.H
+n      });
+    });
+  </script>
+</body>
+</html>
