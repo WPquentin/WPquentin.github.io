@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ars Magna</title>
+  <style>
+    :root { --maxw: 860px; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 10px; }
+    p { margin: 8px 0; line-height: 1.5; }
+    .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    button {
+      border: 1px solid #111827; background: #111827; color: white;
+      border-radius: 12px; padding: 10px 14px; font-size: 14px; cursor: pointer;
+    }
+    button.secondary { background: white; color: #111827; }
+    button:hover { opacity: .92; }
+    .meta { color: #6b7280; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 14px; }
+    @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .lang { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fafafa; }
+    .label { font-weight: 700; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: #374151; margin-bottom: 6px; }
+    .text { font-size: 16px; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 8px; }
+    .footer { margin-top: 14px; color: #6b7280; font-size: 12px; }
+    .small { font-size: 13px; color: #374151; }
+    .controls { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+    @media (min-width: 720px) { .controls { grid-template-columns: 1fr 1fr; } }
+    select, input[type="checkbox"] { transform: translateY(1px); }
+    .ctl { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px 12px; }
+    .ctl b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #374151; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Ars Magna </h1>
+    <div class="card">
+      <div class="controls">
+        <div class="ctl">
+          <b>Mode</b>
+          <label>
+            <select id="mode">
+              <option value="binary">Binary (2-term)</option>
+              <option value="ternary" selected>Ternary (3-term)</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="ctl">
+          <b>Options</b>
+          <label class="meta" style="display:block; margin:6px 0;">
+            <input id="allowReflexive" type="checkbox" />
+            Allow reflexive forms (e.g., “Bonitas est bona per bonitatem”)
+          </label>
+          <label class="meta" style="display:block; margin:6px 0;">
+            <input id="preferDivine" type="checkbox" checked />
+            Prefer “divine attributes” vocabulary (Llull-ish)
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="genBtn">Generate</button>
+        <button class="secondary" id="copyBtn" title="Copy both lines">Copy</button>
+        <span class="meta" id="sig"></span>
+      </div>
+
+      <div class="grid" style="margin-top: 14px;">
+        <div class="lang">
+          <div class="label">Latin</div>
+          <div class="text" id="latin">—</div>
+        </div>
+        <div class="lang">
+          <div class="label">English</div>
+          <div class="text" id="english">—</div>
+        </div>
+      </div>
+
+      
+    </div>
+  </div>
+
+  <script>
+    // --- Vocabulary ---
+    // Two pools: "divine attributes" (Llull-ish) and a slightly broader "virtue/logic" pool.
+    const poolDivine = [
+      { key:"B", laN:"Bonitas",     laA:"bona",     en:"goodness" },
+      { key:"C", laN:"Magnitudo",   laA:"magna",    en:"greatness" },
+      { key:"D", laN:"Eternitas",   laA:"aeterna",  en:"eternity" },
+      { key:"E", laN:"Potestas",    laA:"potens",   en:"power" },
+      { key:"F", laN:"Sapientia",   laA:"sapiens",  en:"wisdom" },
+      { key:"G", laN:"Voluntas",    laA:"volens",   en:"will" },
+      { key:"H", laN:"Virtus",      laA:"virtuosa", en:"virtue" },
+      { key:"I", laN:"Veritas",     laA:"vera",     en:"truth" },
+      { key:"K", laN:"Gloria",      laA:"gloriosa", en:"glory" }
+    ];
+
+    const poolBroader = [
+      ...poolDivine,
+      { key:"L", laN:"Unitas",      laA:"una",      en:"unity" },
+      { key:"M", laN:"Iustitia",    laA:"iusta",    en:"justice" },
+      { key:"N", laN:"Misericordia",laA:"misericors",en:"mercy" },
+      { key:"O", laN:"Pax",         laA:"pacata",   en:"peace" }
+    ];
+
+    // --- Templates ---
+    // We keep templates parallel: Latin + English, with placeholders for terms.
+    // Binary templates:
+    const templatesBinary = [
+      {
+        id:"BIN-1",
+        la: (x,y)=> `${x.laN} et ${y.laN} concordant.`,
+        en: (x,y)=> `${cap(x.en)} and ${y.en} are in harmony.`
+      },
+      {
+        id:"BIN-2",
+        la: (x,y)=> `${x.laN} non contradicit ${dat(y)}.`,
+        en: (x,y)=> `${cap(x.en)} does not contradict ${y.en}.`
+      },
+      {
+        id:"BIN-3",
+        la: (x,y)=> `${x.laN} est ${adj(x)} per ${abl(x)}.`,
+        en: (x,y)=> `${cap(x.en)} is itself through ${x.en}.`
+      },
+      {
+        id:"BIN-4",
+        la: (x,y)=> `${x.laN} ordinat ${acc(y)}.`,
+        en: (x,y)=> `${cap(x.en)} orders ${y.en}.`
+      }
+    ];
+
+    // Ternary templates:
+    const templatesTernary = [
+      {
+        id:"TER-1",
+        la: (x,y,z)=> `${x.laN} per ${abl(y)} producit ${acc(z)}.`,
+        en: (x,y,z)=> `${cap(x.en)} produces ${z.en} through ${y.en}.`
+      },
+      {
+        id:"TER-2",
+        la: (x,y,z)=> `${x.laN}, ${y.laN} et ${z.laN} sunt inseparabiles.`,
+        en: (x,y,z)=> `${cap(x.en)}, ${y.en}, and ${z.en} are inseparable.`
+      },
+      {
+        id:"TER-3",
+        la: (x,y,z)=> `${x.laN} ordinat ${acc(y)} per ${abl(z)}.`,
+        en: (x,y,z)=> `${cap(x.en)} orders ${y.en} by means of ${z.en}.`
+      },
+      {
+        id:"TER-4",
+        la: (x,y,z)=> `${x.laN} sine ${abl(y)} non est ${adj(x)}.`,
+        en: (x,y,z)=> `Without ${y.en}, ${x.en} is not truly ${x.en}.`
+      }
+    ];
+
+    // --- Tiny Latin helpers (toy-level; not a full morphology engine) ---
+    // These are intentionally simple, just to make the output "Latin-looking".
+    function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    // Pretend cases: we will just use the nominative (laN) for most, and naive transformations.
+    // ABL (per + abl): "bonitate" from "Bonitas" etc.
+    function abl(term){
+      // very naive: -tas -> -tate, -ia -> -ia, others -> term
+      const n = term.laN;
+      if (n.endsWith("tas")) return n.slice(0,-3) + "tate";
+      if (n.endsWith("tias")) return n.slice(0,-4) + "tiis";
+      if (n.endsWith("ia")) return n; // close enough for toy
+      if (n.endsWith("a")) return n;  // e.g., Pax (not a)
+      return n;
+    }
+    // ACC (direct object): toy—use same as nominative
+    function acc(term){ return term.laN; }
+
+    // DAT (to/for): toy—use same as nominative
+    function dat(term){ return term.laN; }
+
+    function adj(term){
+      // Use provided adjective-ish form for "est X"
+      return term.laA;
+    }
+
+    // --- Sampling ---
+    function randInt(n){ return Math.floor(Math.random() * n); }
+    function sample(arr){ return arr[randInt(arr.length)]; }
+
+    function pickPool(preferDivine){
+      return preferDivine ? poolDivine : poolBroader;
+    }
+
+    function pickDistinct(pool, k, allowReflexive){
+      const out = [];
+      for (let tries = 0; tries < 200 && out.length < k; tries++){
+        const t = sample(pool);
+        if (allowReflexive) { out.push(t); continue; }
+        if (!out.some(u => u.key === t.key)) out.push(t);
+      }
+      // Fallback: if not enough distinct, allow repeats (shouldn't happen with these sizes)
+      while (out.length < k) out.push(sample(pool));
+      return out;
+    }
+
+    function chooseMode(mode){
+      if (mode === "binary") return "binary";
+      if (mode === "ternary") return "ternary";
+      return (Math.random() < 0.45) ? "binary" : "ternary";
+    }
+
+    function generate(){
+      const modeSel = document.getElementById("mode").value;
+      const allowReflexive = document.getElementById("allowReflexive").checked;
+      const preferDivine = document.getElementById("preferDivine").checked;
+
+      const pool = pickPool(preferDivine);
+      const mode = chooseMode(modeSel);
+
+      if (mode === "binary"){
+        const tpl = sample(templatesBinary);
+        const [x,y] = pickDistinct(pool, 2, allowReflexive);
+
+        // If reflexive not allowed, avoid BIN-3 which is inherently reflexive-ish.
+        if (!allowReflexive && tpl.id === "BIN-3"){
+          // pick a non-reflexive template
+          const safe = templatesBinary.filter(t => t.id !== "BIN-3");
+          const t2 = sample(safe);
+          return { mode, tpl: t2.id, terms:[x,y], la: t2.la(x,y), en: t2.en(x,y) };
+        }
+        return { mode, tpl: tpl.id, terms:[x,y], la: tpl.la(x,y), en: tpl.en(x,y) };
+      } else {
+        const tpl = sample(templatesTernary);
+        const [x,y,z] = pickDistinct(pool, 3, allowReflexive);
+
+        // TER-4 can read odd in English; still fine for toy. Keep.
+        return { mode, tpl: tpl.id, terms:[x,y,z], la: tpl.la(x,y,z), en: tpl.en(x,y,z) };
+      }
+    }
+
+    // --- UI ---
+    const latinEl = document.getElementById("latin");
+    const englishEl = document.getElementById("english");
+    const sigEl = document.getElementById("sig");
+
+    function render(g){
+      latinEl.textContent = g.la;
+      englishEl.textContent = g.en;
+      const keys = g.terms.map(t=>t.key).join("-");
+      sigEl.textContent = `mode=${g.mode} · template=${g.tpl} · wheel=${keys}`;
+    }
+
+    document.getElementById("genBtn").addEventListener("click", () => {
+      render(generate());
+    });
+
+    document.getElementById("copyBtn").addEventListener("click", async () => {
+      const txt = `Latin: ${latinEl.textContent}\nEnglish: ${englishEl.textContent}`;
+      try {
+        await navigator.clipboard.writeText(txt);
+        sigEl.textContent = sigEl.textContent + " · copied";
+        setTimeout(()=>{ sigEl.textContent = sigEl.textContent.replace(" · copied",""); }, 900);
+      } catch {
+        // Fallback for older browsers
+        const ta = document.createElement("textarea");
+        ta.value = txt;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        sigEl.textContent = sigEl.textContent + " · copied";
+        setTimeout(()=>{ sigEl.textContent = sigEl.textContent.replace(" · copied",""); }, 900);
+      }
+    });
+
+    // Auto-generate on load
+    render(generate());
+  </script>
+</body>
+</html>
