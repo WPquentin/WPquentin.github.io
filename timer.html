@@ -322,14 +322,31 @@
 
     function playNotification() {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 660; 
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.8);
+        
+        // Function to play a single short beep
+        const shortBeep = (startTime) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.value = 880; // Higher pitch for a "chirp" sound
+            
+            // Volume envelope: start at 0.5, quickly drop to 0.01
+            gain.gain.setValueAtTime(0.5, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+            
+            osc.start(startTime);
+            osc.stop(startTime + 0.15); // Short duration
+        };
+    
+        // Trigger 3 beeps with 0.2s intervals
+        const now = ctx.currentTime;
+        shortBeep(now);
+        shortBeep(now + 0.2);
+        shortBeep(now + 0.4);
     }
 </script>
 
