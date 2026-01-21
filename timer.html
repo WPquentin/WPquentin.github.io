@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Loop Timer</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --warning: #ca8a04;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --text: #1e293b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        #current-clock {
+            font-family: monospace;
+            font-size: 1rem;
+            color: #64748b;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #64748b;
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .timer-display {
+            text-align: center;
+            font-size: 5rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            margin: 20px 0;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .stage-indicator {
+            text-align: center;
+            color: #64748b;
+            font-weight: 500;
+            margin-bottom: 30px;
+        }
+
+        .setup-section {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        .interval-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
+
+        input {
+            padding: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        input[type="number"] { width: 60px; }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-add { background: #f1f5f9; color: var(--text); width: 100%; margin: 10px 0; border: 1px dashed #cbd5e1; }
+        .btn-add:hover { background: #e2e8f0; }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .start { background: var(--primary); color: white; }
+        .pause { background: var(--warning); color: white; }
+        .reset { background: #94a3b8; color: white; }
+        .remove-btn { background: none; color: var(--danger); font-size: 1.2rem; }
+
+        .loop-config {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="header">
+        <span style="font-weight: bold;">Timer Pro</span>
+        <div id="current-clock">00:00:00</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span class="stat-label">Current Loop</span>
+            <span class="stat-value" id="loop-count">0</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Total Elapsed</span>
+            <span class="stat-value" id="total-time-display">00:00</span>
+        </div>
+    </div>
+
+    <div class="timer-display" id="display">00:00</div>
+    <div class="stage-indicator" id="current-stage-name">READY</div>
+
+    <div class="setup-section">
+        <div id="interval-container">
+            <div class="interval-row">
+                <span style="min-width: 70px;">Step 1:</span>
+                <input type="number" class="min" value="0" min="0" placeholder="Min">
+                <span>:</span>
+                <input type="number" class="sec" value="10" min="0" max="59" placeholder="Sec">
+            </div>
+        </div>
+        
+        <button class="btn btn-add" onclick="addInterval()">+ Add Interval</button>
+
+        <div class="loop-config">
+            <div>
+                <label>Loops:</label>
+                <input type="number" id="loop-limit" value="1" min="1">
+            </div>
+            <label style="cursor: pointer;">
+                <input type="checkbox" id="infinite-loop"> Infinite Loop
+            </label>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn start" id="startBtn" onclick="toggleTimer()">START</button>
+        <button class="btn pause" onclick="pauseTimer()">PAUSE</button>
+        <button class="btn reset" onclick="resetTimer()">RESET</button>
+    </div>
+</div>
+
+<script>
+    let intervals = [];
+    let currentIntervalIdx = 0;
+    let currentLoop = 0;
+    let totalSecondsElapsed = 0;
+    let timeLeft = 0;
+    let timerId = null;
+    let isPaused = true;
+
+    // Local Clock
+    setInterval(() => {
+        document.getElementById('current-clock').textContent = new Date().toLocaleTimeString();
+    }, 1000);
+
+    function addInterval() {
+        const container = document.getElementById('interval-container');
+        const count = container.children.length + 1;
+        const div = document.createElement('div');
+        div.className = 'interval-row';
+        div.innerHTML = `
+            <span style="min-width: 70px;">Step ${count}:</span>
+            <input type="number" class="min" value="0" min="0"> :
+            <input type="number" class="sec" value="0" min="0" max="59">
+            <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+        `;
+        container.appendChild(div);
+    }
+
+    function toggleTimer() {
+        if (!isPaused) return;
+        if (timerId === null) setupQueue();
+        if (intervals.length === 0) return alert("Please set a valid time!");
+        
+        isPaused = false;
+        document.getElementById('startBtn').style.opacity = "0.5";
+        timerId = setInterval(tick, 1000);
+    }
+
+    function setupQueue() {
+        intervals = [];
+        document.querySelectorAll('.interval-row').forEach(row => {
+            const m = parseInt(row.querySelector('.min').value) || 0;
+            const s = parseInt(row.querySelector('.sec').value) || 0;
+            if (m + s > 0) intervals.push(m * 60 + s);
+        });
+        
+        currentIntervalIdx = 0;
+        currentLoop = 1;
+        totalSecondsElapsed = 0;
+        timeLeft = intervals[0];
+        updateUI();
+    }
+
+    function tick() {
+        if (timeLeft > 0) {
+            timeLeft--;
+            totalSecondsElapsed++;
+            updateUI();
+        } else {
+            playNotification();
+            nextStep();
+        }
+    }
+
+    function nextStep() {
+        currentIntervalIdx++;
+        if (currentIntervalIdx >= intervals.length) {
+            const isInfinite = document.getElementById('infinite-loop').checked;
+            const limit = parseInt(document.getElementById('loop-limit').value);
+            
+            if (isInfinite || currentLoop < limit) {
+                currentLoop++;
+                currentIntervalIdx = 0;
+                timeLeft = intervals[0];
+            } else {
+                complete();
+                return;
+            }
+        } else {
+            timeLeft = intervals[currentIntervalIdx];
+        }
+        updateUI();
+    }
+
+    function updateUI() {
+        const m = Math.floor(timeLeft / 60);
+        const s = timeLeft % 60;
+        document.getElementById('display').textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        document.getElementById('loop-count').textContent = currentLoop;
+        
+        const tm = Math.floor(totalSecondsElapsed / 60);
+        const ts = totalSecondsElapsed % 60;
+        document.getElementById('total-time-display').textContent = `${String(tm).padStart(2, '0')}:${String(ts).padStart(2, '0')}`;
+        document.getElementById('current-stage-name').textContent = `STAGE ${currentIntervalIdx + 1} / ${intervals.length}`;
+    }
+
+    function pauseTimer() {
+        isPaused = true;
+        clearInterval(timerId);
+        document.getElementById('startBtn').style.opacity = "1";
+    }
+
+    function resetTimer() {
+        pauseTimer();
+        timerId = null;
+        currentLoop = 0;
+        totalSecondsElapsed = 0;
+        document.getElementById('display').textContent = "00:00";
+        document.getElementById('loop-count').textContent = "0";
+        document.getElementById('total-time-display').textContent = "00:00";
+        document.getElementById('current-stage-name').textContent = "READY";
+    }
+
+    function complete() {
+        pauseTimer();
+        timerId = null;
+        document.getElementById('current-stage-name').textContent = "FINISHED";
+        alert("Session Complete!");
+    }
+
+    function playNotification() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 660; 
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.8);
+    }
+</script>
+
+</body>
+</html>
