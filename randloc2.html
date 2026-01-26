@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -7,66 +7,68 @@
   <style>
     :root { color-scheme: light dark; }
     body {
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;
       margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
       background-color: canvas; color: canvastext; overflow-x: hidden;
     }
-    .card { width: min(800px, 100%); border: 1px solid rgba(127,127,127,.25); border-radius: 16px; padding: 40px; box-shadow: 0 4px 24px rgba(0,0,0,0.05); position: relative; }
+    .card { width: min(820px, 100%); border: 1px solid rgba(127,127,127,.25); border-radius: 16px; padding: 40px; box-shadow: 0 4px 24px rgba(0,0,0,0.05); position: relative; }
     
-    /* UI Elements */
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
     h1 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.2em; opacity: 0.5; font-weight: 700; }
-    #menuBtn { background: none; border: 1px solid rgba(127,127,127,0.3); color: inherit; padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; width: auto; margin: 0; }
+    #menuBtn { background: none; border: 1px solid rgba(127,127,127,0.3); color: inherit; padding: 6px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; }
     
-    .section { margin-bottom: 32px; cursor: pointer; }
+    .section { margin-bottom: 32px; cursor: pointer; transition: opacity 0.1s; }
+    .section:active { opacity: 0.6; }
     .label { font-size: 12px; font-weight: 700; opacity: 0.4; margin-bottom: 8px; text-transform: uppercase; }
-    .value { font-size: clamp(32px, 6vw, 64px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
-    .sub-value { font-size: clamp(16px, 3vw, 20px); font-weight: 400; opacity: 0.7; margin-top: 8px; }
+    .value { font-size: clamp(40px, 7vw, 76px); font-weight: 900; line-height: 1.05; letter-spacing: -0.02em; }
+    .sub-value { font-size: clamp(16px, 3vw, 20px); font-weight: 400; opacity: 0.7; margin-top: 10px; }
     
-    button { width: 100%; background: canvastext; color: canvas; border: none; padding: 20px; border-radius: 12px; font-size: 18px; font-weight: 700; cursor: pointer; }
+    button#btn { width: 100%; background: canvastext; color: canvas; border: none; padding: 22px; border-radius: 14px; font-size: 18px; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: 0.3; }
 
-    /* Filter Menu Overlay */
+    /* Filter Menu */
     #menu {
-      position: fixed; top: 0; right: 0; width: min(400px, 100%); height: 100%; 
+      position: fixed; top: 0; right: 0; width: min(420px, 100%); height: 100%; 
       background: canvas; border-left: 1px solid rgba(127,127,127,0.2); 
-      z-index: 100; padding: 24px; display: none; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+      z-index: 100; padding: 32px; display: none; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,0.1);
     }
-    .menu-header { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid rgba(127,127,127,0.1); padding-bottom: 10px; }
-    .pref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
-    .pref-item { display: flex; align-items: center; gap: 8px; }
+    .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .pref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+    .pref-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
     .coords-footer { font-family: ui-monospace, monospace; font-size: 13px; opacity: 0.4; margin-top: 40px; border-top: 1px solid rgba(127,127,127,0.15); padding-top: 20px; display: flex; justify-content: space-between; }
-    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; display: none; z-index: 200; }
+    .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 24px; font-size: 13px; display: none; z-index: 200; }
   </style>
 </head>
 <body>
 
   <div class="card">
     <div class="top-bar">
-        <h1>Japan Sampler</h1>
-        <button id="menuBtn">Filters</button>
+        <h1>Japan Land Sampler</h1>
+        <button id="menuBtn">表示設定 / Filters</button>
     </div>
     
-    <div id="main-content"><div class="status">Loading...</div></div>
+    <div id="main-content"><div style="opacity:0.5">Initializing...</div></div>
     <button id="btn" disabled>PLEASE WAIT</button>
-    <div id="footer" class="coords-footer" style="visibility:hidden;"><span id="latlon">...</span><span>SPACE TO ROLL</span></div>
+    <div id="footer" class="coords-footer" style="visibility:hidden;"><span id="latlon" style="cursor:pointer">0.0, 0.0</span><span>PRESS 'R' TO ROLL</span></div>
   </div>
 
   <div id="menu">
     <div class="menu-header">
-        <b style="font-size: 14px;">FILTERS</b>
-        <a href="#" id="closeMenu" style="text-decoration: none; color: inherit; font-size: 20px;">&times;</a>
+        <b style="letter-spacing: 0.1em;">抽出対象の設定</b>
+        <a href="#" id="closeMenu" style="text-decoration:none; color:inherit; font-size:28px;">&times;</a>
     </div>
-    <p class="label">Quick Islands</p>
-    <div class="pref-grid" style="margin-bottom: 20px;">
-        <label><input type="checkbox" class="island-toggle" value="Honshu" checked> Honshu</label>
-        <label><input type="checkbox" class="island-toggle" value="Hokkaido" checked> Hokkaido</label>
-        <label><input type="checkbox" class="island-toggle" value="Kyushu" checked> Kyushu</label>
-        <label><input type="checkbox" class="island-toggle" value="Shikoku" checked> Shikoku</label>
-        <label><input type="checkbox" class="island-toggle" value="Okinawa" checked> Okinawa</label>
+    
+    <p class="label">主要な島 / Islands</p>
+    <div class="pref-grid" style="margin-bottom: 24px; background: rgba(127,127,127,0.05); padding: 12px; border-radius: 8px;">
+        <label class="pref-item"><input type="checkbox" class="island-toggle" value="Honshu" checked> 本州</label>
+        <label class="pref-item"><input type="checkbox" class="island-toggle" value="Hokkaido" checked> 北海道</label>
+        <label class="pref-item"><input type="checkbox" class="island-toggle" value="Kyushu" checked> 九州</label>
+        <label class="pref-item"><input type="checkbox" class="island-toggle" value="Shikoku" checked> 四国</label>
+        <label class="pref-item"><input type="checkbox" class="island-toggle" value="Okinawa" checked> 沖縄</label>
     </div>
-    <p class="label">Prefectures</p>
+
+    <p class="label">都道府県 / Prefectures</p>
     <div id="prefList" class="pref-grid"></div>
   </div>
 
@@ -74,12 +76,13 @@
 
   <script>
     let triangles = [], totalArea = 0, cityData = [], jpData = [];
-    const islandBounds = {
-        Hokkaido: { lat: [41, 46], lon: [139, 146] },
-        Honshu: { lat: [33, 42], lon: [130, 143] },
-        Kyushu: { lat: [30, 34], lon: [129, 132] },
-        Shikoku: { lat: [32, 35], lon: [132, 135] },
-        Okinawa: { lat: [24, 28], lon: [122, 130] }
+    
+    const islandMap = {
+        "Hokkaido": ["北海道"],
+        "Honshu": ["青森県","岩手県","宮城県","秋田県","山形県","福島県","茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県","新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県","静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県"],
+        "Shikoku": ["徳島県","香川県","愛媛県","高知県"],
+        "Kyushu": ["福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県"],
+        "Okinawa": ["沖縄県"]
     };
 
     const btn = document.getElementById('btn'), mainContent = document.getElementById('main-content'),
@@ -87,13 +90,12 @@
           toast = document.getElementById('toast');
 
     function showToast(t) { toast.innerText = t; toast.style.display='block'; setTimeout(()=>toast.style.display='none',2000); }
-    function copy(t) { navigator.clipboard.writeText(t); showToast("Copied: " + t); }
+    function copy(t) { if(!t)return; navigator.clipboard.writeText(t); showToast("Copied: " + t); }
 
-    // Identify which island a polygon belongs to (heuristic)
-    function getIsland(lat, lon) {
-        if (lat > 41.5) return "Hokkaido";
-        if (lat < 29) return "Okinawa";
-        if (lon < 131.5) return "Kyushu";
+    function getIslandByLatLon(lat, lon) {
+        if (lat > 41.2) return "Hokkaido";
+        if (lat < 28.5) return "Okinawa";
+        if (lon < 131.1) return "Kyushu";
         if (lat < 34.5 && lon < 135 && lon > 132) return "Shikoku";
         return "Honshu";
     }
@@ -104,34 +106,61 @@
         jpData = (await r1.json()).features;
         cityData = await r2.json();
 
-        // Build Prefecture List in Menu
-        const prefs = [...new Set(cityData.map(c => c.prefecture_romaji))].sort();
-        prefList.innerHTML = prefs.map(p => `<label class="pref-item"><input type="checkbox" class="pref-toggle" value="${p}" checked> ${p.replace(' Ken','').replace(' To','').replace(' Fu','')}</label>`).join('');
+        const prefs = [...new Set(cityData.map(c => c.prefecture_kanji))];
+        prefList.innerHTML = prefs.map(p => `
+            <label class="pref-item" data-pref="${p}">
+                <input type="checkbox" class="pref-toggle" value="${p}" checked> ${p}
+            </label>`).join('');
 
+        setupInteractions();
         updateActiveData();
         btn.disabled = false; btn.textContent = "SAMPLE RANDOM LOCATION";
         roll();
-      } catch (e) { document.getElementById('status').innerText = e; }
+      } catch (e) { console.error(e); }
+    }
+
+    function setupInteractions() {
+        document.querySelectorAll('.island-toggle').forEach(islandBox => {
+            islandBox.onchange = () => {
+                const targetPrefs = islandMap[islandBox.value];
+                document.querySelectorAll('.pref-toggle').forEach(pBox => {
+                    if (targetPrefs.includes(pBox.value)) pBox.checked = islandBox.checked;
+                });
+            };
+        });
+
+        document.querySelectorAll('.pref-toggle').forEach(pBox => {
+            pBox.onchange = () => {
+                for (let island in islandMap) {
+                    if (islandMap[island].includes(pBox.value)) {
+                        const allOfIsland = document.querySelectorAll(`.pref-toggle[value]`);
+                        const anyChecked = islandMap[island].some(pName => 
+                            document.querySelector(`.pref-toggle[value="${pName}"]`).checked
+                        );
+                        document.querySelector(`.island-toggle[value="${island}"]`).checked = anyChecked;
+                    }
+                }
+            };
+        });
     }
 
     function updateActiveData() {
         triangles = []; totalArea = 0;
         const activePrefs = new Set([...document.querySelectorAll('.pref-toggle:checked')].map(i => i.value));
-        const activeIslands = new Set([...document.querySelectorAll('.island-toggle:checked')].map(i => i.value));
 
         jpData.forEach(f => {
-            const prefName = f.properties.name || ""; // Depends on jp.json structure, heuristic fallback below
             const polys = f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [f.geometry.coordinates];
-            
             polys.forEach(ringSet => {
                 const ring = ringSet[0];
-                const island = getIsland(ring[0][1], ring[0][0]);
-                if (!activeIslands.has(island)) return;
+                const island = getIslandByLatLon(ring[0][1], ring[0][0]);
+                
+                const sampleCity = cityData.find(c => Math.abs(c.lat - ring[0][1]) < 0.5 && Math.abs(c.lon - ring[0][0]) < 0.5);
+                if (sampleCity && !activePrefs.has(sampleCity.prefecture_kanji)) return;
 
                 for (let i = 1; i < ring.length - 1; i++) {
                     const a = ring[0], b = ring[i], c = ring[i+1];
                     const area = Math.abs((a[0]*(b[1]-c[1]) + b[0]*(c[1]-a[1]) + c[0]*(a[1]-b[1])) / 2);
-                    triangles.push({a, b, c, area, island});
+                    triangles.push({a, b, c, area});
                     totalArea += area;
                 }
             });
@@ -139,7 +168,7 @@
     }
 
     function roll() {
-      if (totalArea === 0) { mainContent.innerHTML = "No areas selected."; return; }
+      if (totalArea === 0) { mainContent.innerHTML = "<div class='status'>Please select at least one area.</div>"; return; }
       let r = Math.random() * totalArea, tri = triangles[0];
       for (const t of triangles) { r -= t.area; if (r <= 0) { tri = t; break; } }
       
@@ -149,10 +178,9 @@
         lat: (1 - r1) * tri.a[1] + (r1 * (1 - r2)) * tri.b[1] + (r1 * r2) * tri.c[1]
       };
 
-      // Filter nearest search by active island if possible
       let nearCity = null, dCity = Infinity, nearTown = null, dTown = Infinity;
       cityData.forEach(c => {
-        const d = Math.pow(c.lat - pt.lat, 2) + Math.pow(c.lon - pt.lon, 2);
+        const d = Math.pow(parseFloat(c.lat) - pt.lat, 2) + Math.pow(parseFloat(c.lon) - pt.lon, 2);
         if (c.name_romaji.endsWith("Shi") || c.name_romaji.endsWith("Ku")) {
             if (d < dCity) { dCity = d; nearCity = c; }
         } else {
@@ -161,15 +189,30 @@
       });
 
       mainContent.innerHTML = `
-        <div class="section" onclick="copy('${nearCity.name_kanji}')"><div class="label">City</div><div class="value">${nearCity.name_kanji}</div><div class="sub-value">${nearCity.name_romaji}, ${nearCity.prefecture_romaji}</div></div>
-        <div class="section" onclick="copy('${nearTown.name_kanji}')"><div class="label">Town/Village</div><div class="value">${nearTown.name_kanji}</div><div class="sub-value">${nearTown.name_romaji}, ${nearTown.prefecture_romaji}</div></div>
+        <div class="section" onclick="copy('${nearCity.name_kanji}')">
+            <div class="label">City / 市・区</div>
+            <div class="value">${nearCity.name_kanji}</div>
+            <div class="sub-value">${nearCity.name_romaji}, ${nearCity.prefecture_romaji}</div>
+        </div>
+        <div class="section" onclick="copy('${nearTown.name_kanji}')">
+            <div class="label">Municipality / 町村</div>
+            <div class="value">${nearTown.name_kanji}</div>
+            <div class="sub-value">${nearTown.name_romaji}, ${nearTown.prefecture_romaji}</div>
+        </div>
       `;
       document.getElementById('footer').style.visibility = "visible";
-      document.getElementById('latlon').innerText = `${pt.lat.toFixed(6)}, ${pt.lon.toFixed(6)}`;
+      const cStr = `${pt.lat.toFixed(6)}, ${pt.lon.toFixed(6)}`;
+      document.getElementById('latlon').innerText = cStr;
+      document.getElementById('latlon').onclick = () => copy(cStr);
     }
 
     document.getElementById('menuBtn').onclick = () => menu.style.display = 'block';
-    document.getElementById('closeMenu').onclick = (e) => { e.preventDefault(); menu.style.display = 'none'; updateActiveData(); };
+    document.getElementById('closeMenu').onclick = (e) => { 
+        e.preventDefault(); 
+        menu.style.display = 'none'; 
+        updateActiveData(); 
+        roll(); 
+    };
     btn.onclick = roll;
     window.onkeydown = (e) => { if(e.key.toLowerCase()==='r' || e.code==='Space') roll(); };
     init();
