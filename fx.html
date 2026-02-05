@@ -289,13 +289,21 @@
         datasets: [{
           label: `${BASE}/${quote}`,
           data,
-          spanGaps: true
+          spanGaps: true,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          pointHitRadius: 10,
+          borderWidth: 2,
+          tension: 0.15
         }]
       },
       options: {
         responsive: true,
         interaction: { mode: "index", intersect: false },
         plugins: { legend: { display: true } },
+        elements: {
+          point: { radius: 0 }
+        },
         scales: {
           x: { ticks: { maxTicksLimit: 8 } }
         }
