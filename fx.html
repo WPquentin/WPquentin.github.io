@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>USD FX Dashboard (CNY/EUR/JPY)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 16px; }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
+    .muted { color: #666; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button { padding: 8px 10px; border-radius: 10px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    button.active { border-color: #000; font-weight: 600; }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h2>USD Exchange Rates (USD → CNY / EUR / JPY)</h2>
+  <div class="toolbar">
+    <button id="btn-7" class="active" data-days="7">1W</button>
+    <button id="btn-30" data-days="30">1M</button>
+    <button id="btn-365" data-days="365">1Y</button>
+    <button id="btn-refresh">Refresh</button>
+    <span class="muted" id="status"></span>
+  </div>
+
+  <div class="row" style="margin-top:12px;">
+    <div class="card">
+      <div><b>Latest rates</b></div>
+      <div class="muted" id="latestMeta">—</div>
+      <table style="margin-top:8px;">
+        <thead>
+          <tr><th>Pair</th><th>Rate</th></tr>
+        </thead>
+        <tbody id="latestTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div><b>Range stats (move &amp; amplitude)</b></div>
+      <div class="muted" id="rangeMeta">—</div>
+      <table style="margin-top:8px;">
+        <thead>
+          <tr>
+            <th>Quote</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Change (%)</th>
+            <th>High</th>
+            <th>Low</th>
+            <th>Amplitude (High-Low)</th>
+            <th>Amplitude / Start (%)</th>
+          </tr>
+        </thead>
+        <tbody id="statsTable"></tbody>
+      </table>
+      <div class="muted">
+        “Amplitude” is computed as <b>High − Low</b> over the selected window.
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div><b>History (selected window)</b></div>
+    <div class="muted">
+      Data source is ECB/Frankfurter; points are typically available for business days only.
+    </div>
+    <canvas id="chart" height="110"></canvas>
+    <div class="error" id="err"></div>
+  </div>
+
+<script>
+(() => {
+  // Public API (ECB reference rates): https://frankfurter.dev
+  const API = "https://api.frankfurter.dev";
+  const BASE = "USD";
+  const QUOTES = ["CNY", "EUR", "JPY"];
+
+  const el = (id) => document.getElementById(id);
+  const statusEl = el("status");
+  const errEl = el("err");
+
+  let chart = null;
+  let currentDays = 7;
+
+  function yyyy_mm_dd(d) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  function dateNDaysAgo(days) {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d;
+  }
+
+  async function fetchJSON(url) {
+    const resp = await fetch(url, { cache: "no-store" });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${url}`);
+    return await resp.json();
+  }
+
+  function fmt(x, digits=6) {
+    if (x === null || x === undefined || Number.isNaN(x)) return "—";
+    return Number(x).toFixed(digits);
+  }
+
+  function pct(x, digits=2) {
+    if (x === null || x === undefined || Number.isNaN(x)) return "—";
+    return (Number(x) * 100).toFixed(digits);
+  }
+
+  function setActiveButton(days) {
+    for (const d of [7, 30, 365]) {
+      el(`btn-${d}`).classList.toggle("active", d === days);
+    }
+  }
+
+  function renderLatest(latest) {
+    el("latestMeta").textContent = `Data date: ${latest.date} (base=${latest.base})`;
+    const tbody = el("latestTable");
+    tbody.innerHTML = "";
+    for (const q of QUOTES) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${BASE}/${q}</td><td>${fmt(latest.rates[q], q==="JPY" ? 4 : 6)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function computeStats(timeseries) {
+    const dates = Object.keys(timeseries.rates).sort();
+    const firstDate = dates[0];
+    const lastDate = dates[dates.length - 1];
+
+    const byQuote = {};
+    for (const q of QUOTES) {
+      const series = dates
+        .map(dt => timeseries.rates[dt][q])
+        .filter(v => v !== undefined && v !== null && !Number.isNaN(v));
+
+      const start = timeseries.rates[firstDate]?.[q];
+      const end = timeseries.rates[lastDate]?.[q];
+      const high = Math.max(...series);
+      const low = Math.min(...series);
+      const amplitude = high - low;
+      const change = (end - start) / start;
+      const amplitudePct = amplitude / start;
+
+      byQuote[q] = { start, end, high, low, amplitude, change, amplitudePct };
+    }
+
+    return { dates, firstDate, lastDate, byQuote };
+  }
+
+  function renderStats(stats, days) {
+    el("rangeMeta").textContent =
+      `Window: ${stats.firstDate} → ${stats.lastDate} (~${days} days; ${stats.dates.length} data points)`;
+
+    const tbody = el("statsTable");
+    tbody.innerHTML = "";
+    for (const q of QUOTES) {
+      const s = stats.byQuote[q];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${q}</td>
+        <td>${fmt(s.start, q==="JPY" ? 4 : 6)}</td>
+        <td>${fmt(s.end, q==="JPY" ? 4 : 6)}</td>
+        <td>${pct(s.change, 2)}</td>
+        <td>${fmt(s.high, q==="JPY" ? 4 : 6)}</td>
+        <td>${fmt(s.low, q==="JPY" ? 4 : 6)}</td>
+        <td>${fmt(s.amplitude, q==="JPY" ? 4 : 6)}</td>
+        <td>${pct(s.amplitudePct, 2)}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderChart(timeseries, stats) {
+    const labels = stats.dates;
+    const datasets = QUOTES.map(q => ({
+      label: `${BASE}/${q}`,
+      data: labels.map(dt => timeseries.rates[dt][q]),
+      spanGaps: true
+    }));
+
+    const ctx = el("chart").getContext("2d");
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: true } },
+        scales: { x: { ticks: { maxTicksLimit: 10 } } }
+      }
+    });
+  }
+
+  async function loadAll(days) {
+    errEl.textContent = "";
+    statusEl.textContent = "Loading…";
+    const toList = QUOTES.join(",");
+
+    const latestUrl = `${API}/latest?from=${BASE}&to=${toList}`;
+    const start = yyyy_mm_dd(dateNDaysAgo(days));
+    const end = yyyy_mm_dd(new Date());
+    const tsUrl = `${API}/${start}..${end}?from=${BASE}&to=${toList}`;
+
+    try {
+      const [latest, ts] = await Promise.all([fetchJSON(latestUrl), fetchJSON(tsUrl)]);
+      renderLatest(latest);
+
+      const stats = computeStats(ts);
+      renderStats(stats, days);
+      renderChart(ts, stats);
+
+      statusEl.textContent = `Updated: ${new Date().toLocaleString()}`;
+    } catch (e) {
+      console.error(e);
+      errEl.textContent = `Failed to load data: ${e.message}`;
+      statusEl.textContent = "";
+    }
+  }
+
+  for (const d of [7, 30, 365]) {
+    el(`btn-${d}`).addEventListener("click", () => {
+      currentDays = d;
+      setActiveButton(d);
+      loadAll(d);
+    });
+  }
+  el("btn-refresh").addEventListener("click", () => loadAll(currentDays));
+
+  loadAll(currentDays);
+})();
+</script>
+</body>
+</html>
